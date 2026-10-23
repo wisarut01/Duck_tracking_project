@@ -1,0 +1,7 @@
+# Config for `npx @redocly/cli lint api/openapi.yaml` (picked up automatically from the repo root).
+extends:
+  - recommended
+
+rules:
+  # localhost servers are intended (mock :4010, gateway :8080).
+  no-server-example.com: off

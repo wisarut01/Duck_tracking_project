@@ -1,0 +1,820 @@
+openapi: 3.0.3
+info:
+  title: Tracking Board API (Gateway)
+  version: 0.1.0
+  description: |
+    REST API ที่ api-gateway เปิดให้ Frontend ใช้ — **single source of truth** ของ FE ↔ BE.
+    กติกา: ID = UUID, เวลา = ISO-8601 UTC, JSON = camelCase, error = `{ error: { code, message } }`.
+    Auth: `Authorization: Bearer <JWT>` ทุก endpoint ยกเว้น /auth/register และ /auth/login
+
+    กติกาที่ใช้กับทุก endpoint:
+    - ไม่มี token หรือ token ไม่ถูกต้อง → `401 UNAUTHENTICATED`
+    - path / query / body ผิดรูปแบบ → `400 VALIDATION_FAILED`; path อ้างถึงของที่ไม่มี → `404 NOT_FOUND`
+    - path หรือ method ที่ไม่มีใน spec → `404 NOT_FOUND` (ไม่ใช้ 405)
+    - ข้อความที่บังคับกรอก (title, name, displayName, comment body, คำค้น `q`) ต้องมีตัวอักษรอย่างน้อย 1 ตัวที่ไม่ใช่ช่องว่าง
+      (`pattern: '\S'`) ไม่งั้นได้ `400 VALIDATION_FAILED`; server ตัดช่องว่างหน้า/หลังออกก่อนบันทึก
+servers:
+  - url: http://localhost:4010/api/v1
+    description: Mock (Prism)
+  - url: http://localhost:8080/api/v1
+    description: Gateway จริง
+security:
+  - bearerAuth: []
+tags:
+  - name: auth
+  - name: users
+  - name: projects
+  - name: issues
+  - name: comments
+  - name: links
+  - name: spaces
+  - name: pages
+  - name: search
+
+paths:
+  /auth/register:
+    post:
+      tags: [auth]
+      security: []
+      summary: สมัครสมาชิก
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /auth/login:
+    post:
+      tags: [auth]
+      security: []
+      summary: เข้าสู่ระบบ
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: ข้อมูลผู้ใช้ปัจจุบัน
+      operationId: getMe
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /users:
+    get:
+      tags: [users]
+      summary: รายชื่อผู้ใช้ (ใช้เลือก assignee)
+      operationId: listUsers
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/User' }
+              example:
+                - { id: 7f1c2a9e-0000-4000-8000-000000000001, email: duck@example.com, displayName: Duck, avatarUrl: null }
+                - { id: 7f1c2a9e-0000-4000-8000-000000000002, email: mint@example.com, displayName: Mint, avatarUrl: null }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /projects:
+    get:
+      tags: [projects]
+      summary: รายการ project
+      operationId: listProjects
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Project' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [projects]
+      summary: สร้าง project
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateProjectRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Project' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /projects/{projectKey}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectKey'
+    get:
+      tags: [projects]
+      summary: รายละเอียด project
+      operationId: getProject
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Project' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /projects/{projectKey}/issues:
+    parameters:
+      - $ref: '#/components/parameters/ProjectKey'
+    get:
+      tags: [issues]
+      summary: รายการ issue ใน project (ใช้วาด board)
+      description: |
+        เรียงตามคอลัมน์ (`TODO` → `IN_PROGRESS` → `IN_REVIEW` → `DONE`) แล้วตาม `position` จากน้อยไปมาก
+        ดังนั้นถ้า filter ด้วย `status` ผลลัพธ์คือลำดับการ์ดในคอลัมน์นั้นจากบนลงล่าง
+      operationId: listIssues
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/IssueStatus' } }
+        - { name: assigneeId, in: query, schema: { type: string, format: uuid } }
+        - { name: q, in: query, description: ค้นใน title (ไม่สนตัวพิมพ์เล็ก/ใหญ่), schema: { type: string, minLength: 1, pattern: '\S' } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssueList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [issues]
+      summary: สร้าง issue (key ถูกสร้างอัตโนมัติ เช่น TB-13)
+      operationId: createIssue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateIssueRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Issue' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /issues/{issueKey}:
+    parameters:
+      - $ref: '#/components/parameters/IssueKey'
+    get:
+      tags: [issues]
+      summary: รายละเอียด issue
+      operationId: getIssue
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Issue' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [issues]
+      summary: แก้ไข issue (ส่งเฉพาะ field ที่เปลี่ยน)
+      operationId: updateIssue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateIssueRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Issue' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [issues]
+      summary: ลบ issue
+      operationId: deleteIssue
+      responses:
+        '204': { description: Deleted }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /issues/{issueKey}/move:
+    parameters:
+      - $ref: '#/components/parameters/IssueKey'
+    post:
+      tags: [issues]
+      summary: ย้าย issue บน board (drag & drop) — เปลี่ยน status และ/หรือลำดับ
+      operationId: moveIssue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoveIssueRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Issue' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /issues/{issueKey}/comments:
+    parameters:
+      - $ref: '#/components/parameters/IssueKey'
+    get:
+      tags: [comments]
+      summary: comment ของ issue (เก่า → ใหม่)
+      operationId: listComments
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Comment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [comments]
+      summary: เพิ่ม comment
+      operationId: createComment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCommentRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Comment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /issues/{issueKey}/links:
+    parameters:
+      - $ref: '#/components/parameters/IssueKey'
+    get:
+      tags: [links]
+      summary: หน้า Docs ที่ลิงก์กับ issue นี้
+      operationId: listIssueLinks
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PageSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [links]
+      summary: ลิงก์ issue กับหน้า Docs
+      operationId: createIssueLink
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateLinkRequest' }
+      responses:
+        '201':
+          description: Linked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /issues/{issueKey}/links/{pageId}:
+    parameters:
+      - $ref: '#/components/parameters/IssueKey'
+      - $ref: '#/components/parameters/PageId'
+    delete:
+      tags: [links]
+      summary: ยกเลิกลิงก์
+      operationId: deleteIssueLink
+      responses:
+        '204': { description: Unlinked }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /spaces:
+    get:
+      tags: [spaces]
+      summary: รายการ space ของ Docs
+      operationId: listSpaces
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Space' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [spaces]
+      summary: สร้าง space
+      operationId: createSpace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSpaceRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Space' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /spaces/{spaceKey}:
+    parameters:
+      - $ref: '#/components/parameters/SpaceKey'
+    get:
+      tags: [spaces]
+      summary: รายละเอียด space
+      operationId: getSpace
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Space' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /spaces/{spaceKey}/pages:
+    parameters:
+      - $ref: '#/components/parameters/SpaceKey'
+    get:
+      tags: [pages]
+      summary: page tree ของ space (nested)
+      operationId: getPageTree
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PageTreeNode' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [pages]
+      summary: สร้างหน้าใหม่ (parentId = null คือหน้าบนสุด)
+      operationId: createPage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePageRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Page' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /pages/{pageId}:
+    parameters:
+      - $ref: '#/components/parameters/PageId'
+    get:
+      tags: [pages]
+      summary: เนื้อหาหน้า
+      operationId: getPage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Page' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [pages]
+      summary: แก้ไขหน้า (title/content/parentId)
+      operationId: updatePage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdatePageRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Page' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [pages]
+      summary: ลบหน้า (ลบลูกทั้งหมดด้วย)
+      operationId: deletePage
+      responses:
+        '204': { description: Deleted }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /pages/{pageId}/linked-issues:
+    parameters:
+      - $ref: '#/components/parameters/PageId'
+    get:
+      tags: [links]
+      summary: issue ที่ลิงก์กับหน้านี้ (ทิศกลับของ /issues/{key}/links)
+      description: เรียงแบบเดียวกับ `listIssues` (คอลัมน์ แล้ว `position` จากน้อยไปมาก)
+      operationId: listPageLinkedIssues
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/IssueSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /search:
+    get:
+      tags: [search]
+      summary: ค้นหารวมทั้ง issue และ page
+      operationId: search
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 1, pattern: '\S' } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ProjectKey:
+      name: projectKey
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[A-Z][A-Z0-9]{1,9}$', example: TB }
+    IssueKey:
+      name: issueKey
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[A-Z][A-Z0-9]{1,9}-[0-9]+$', example: TB-12 }
+    SpaceKey:
+      name: spaceKey
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[A-Z][A-Z0-9]{1,9}$', example: ENG }
+    PageId:
+      name: pageId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+
+  responses:
+    BadRequest:
+      description: ข้อมูลไม่ถูกต้อง
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: VALIDATION_FAILED, message: title is required } }
+    Unauthorized:
+      description: ไม่ได้ login หรือ token หมดอายุ
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: UNAUTHENTICATED, message: invalid or expired token } }
+    NotFound:
+      description: ไม่พบข้อมูล
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: NOT_FOUND, message: issue TB-999 not found } }
+    Conflict:
+      description: ข้อมูลซ้ำ
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: ALREADY_EXISTS, message: project key TB already exists } }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [VALIDATION_FAILED, UNAUTHENTICATED, PERMISSION_DENIED, NOT_FOUND, ALREADY_EXISTS, INTERNAL]
+            message: { type: string }
+
+    RegisterRequest:
+      type: object
+      required: [email, password, displayName]
+      properties:
+        email: { type: string, format: email, example: duck@example.com }
+        password: { type: string, minLength: 8, example: password123 }
+        displayName: { type: string, minLength: 1, pattern: '\S', maxLength: 50, example: Duck }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, example: duck@example.com }
+        password: { type: string, example: password123 }
+    AuthResponse:
+      type: object
+      required: [accessToken, user]
+      properties:
+        accessToken: { type: string, example: eyJhbGciOiJIUzI1NiJ9.mock.token }
+        user: { $ref: '#/components/schemas/User' }
+
+    User:
+      type: object
+      required: [id, email, displayName]
+      properties:
+        id: { type: string, format: uuid, example: 7f1c2a9e-0000-4000-8000-000000000001 }
+        email: { type: string, format: email, example: duck@example.com }
+        displayName: { type: string, example: Duck }
+        avatarUrl: { type: string, nullable: true, example: null }
+
+    Project:
+      type: object
+      required: [id, key, name, leadId, createdAt]
+      properties:
+        id: { type: string, format: uuid, example: 2b3c4d5e-0000-4000-8000-000000000001 }
+        key: { type: string, example: TB }
+        name: { type: string, example: Tracking Board }
+        description: { type: string, nullable: true, example: Jira + Confluence สำหรับทีมเล็ก }
+        leadId: { type: string, format: uuid, example: 7f1c2a9e-0000-4000-8000-000000000001 }
+        issueCount: { type: integer, example: 12 }
+        createdAt: { type: string, format: date-time, example: '2026-10-01T09:00:00Z' }
+    CreateProjectRequest:
+      type: object
+      required: [key, name]
+      properties:
+        key: { type: string, pattern: '^[A-Z][A-Z0-9]{1,9}$', example: TB }
+        name: { type: string, minLength: 1, pattern: '\S', maxLength: 100, example: Tracking Board }
+        description: { type: string, nullable: true }
+
+    IssueType:
+      type: string
+      enum: [TASK, BUG, STORY]
+    IssueStatus:
+      type: string
+      enum: [TODO, IN_PROGRESS, IN_REVIEW, DONE]
+    IssuePriority:
+      type: string
+      enum: [LOWEST, LOW, MEDIUM, HIGH, HIGHEST]
+
+    IssueSummary:
+      type: object
+      required: [id, key, title, type, status, priority]
+      properties:
+        id: { type: string, format: uuid, example: 3c4d5e6f-0000-4000-8000-000000000012 }
+        key: { type: string, example: TB-12 }
+        title: { type: string, example: ทำหน้า Kanban board }
+        type: { $ref: '#/components/schemas/IssueType' }
+        status: { $ref: '#/components/schemas/IssueStatus' }
+        priority: { $ref: '#/components/schemas/IssuePriority' }
+        assignee:
+          description: ผู้รับผิดชอบ หรือ `null` ถ้ายังไม่มี
+          anyOf:
+            - $ref: '#/components/schemas/User'
+            - { type: object, nullable: true, enum: [null] }
+    Issue:
+      allOf:
+        - $ref: '#/components/schemas/IssueSummary'
+        - type: object
+          required: [projectKey, reporter, position, labels, createdAt, updatedAt]
+          properties:
+            projectKey: { type: string, example: TB }
+            description: { type: string, nullable: true, description: Markdown, example: "ลากการ์ดข้ามคอลัมน์ได้ ดู spec ที่หน้า **Board Spec**" }
+            reporter: { $ref: '#/components/schemas/User' }
+            position: { type: number, description: ลำดับในคอลัมน์ (น้อย = บน), example: 1024 }
+            labels:
+              type: array
+              items: { type: string }
+              example: [frontend]
+            linkedPageCount: { type: integer, example: 1 }
+            createdAt: { type: string, format: date-time, example: '2026-10-02T10:00:00Z' }
+            updatedAt: { type: string, format: date-time, example: '2026-10-03T08:30:00Z' }
+    IssueList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Issue' }
+        page: { type: integer, example: 1 }
+        pageSize: { type: integer, example: 50 }
+        total: { type: integer, example: 1 }
+    CreateIssueRequest:
+      type: object
+      required: [title, type]
+      properties:
+        title: { type: string, minLength: 1, pattern: '\S', maxLength: 200, example: ทำหน้า Kanban board }
+        type: { $ref: '#/components/schemas/IssueType' }
+        description: { type: string, nullable: true }
+        priority: { $ref: '#/components/schemas/IssuePriority' }
+        assigneeId: { type: string, format: uuid, nullable: true }
+        labels:
+          type: array
+          items: { type: string }
+    UpdateIssueRequest:
+      type: object
+      minProperties: 1
+      properties:
+        title: { type: string, minLength: 1, pattern: '\S', maxLength: 200 }
+        description: { type: string, nullable: true }
+        type: { $ref: '#/components/schemas/IssueType' }
+        priority: { $ref: '#/components/schemas/IssuePriority' }
+        assigneeId: { type: string, format: uuid, nullable: true }
+        labels:
+          type: array
+          items: { type: string }
+    MoveIssueRequest:
+      type: object
+      required: [status]
+      description: |
+        ย้ายไปคอลัมน์ `status` และวางระหว่าง `afterKey` กับ `beforeKey` (null = ต้น/ท้ายคอลัมน์).
+        Server คำนวณ position ใหม่เอง
+      properties:
+        status: { $ref: '#/components/schemas/IssueStatus' }
+        afterKey: { type: string, nullable: true, example: TB-3 }
+        beforeKey: { type: string, nullable: true, example: TB-7 }
+
+    Comment:
+      type: object
+      required: [id, issueKey, author, body, createdAt]
+      properties:
+        id: { type: string, format: uuid, example: 4d5e6f70-0000-4000-8000-000000000001 }
+        issueKey: { type: string, example: TB-12 }
+        author: { $ref: '#/components/schemas/User' }
+        body: { type: string, description: Markdown, example: เริ่มทำแล้ว ใช้ dnd-kit }
+        createdAt: { type: string, format: date-time, example: '2026-10-03T08:30:00Z' }
+    CreateCommentRequest:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string, minLength: 1, pattern: '\S', maxLength: 5000 }
+
+    CreateLinkRequest:
+      type: object
+      required: [pageId]
+      properties:
+        pageId: { type: string, format: uuid, example: 5e6f7081-0000-4000-8000-000000000001 }
+
+    Space:
+      type: object
+      required: [id, key, name, createdAt]
+      properties:
+        id: { type: string, format: uuid, example: 6f708192-0000-4000-8000-000000000001 }
+        key: { type: string, example: ENG }
+        name: { type: string, example: Engineering }
+        description: { type: string, nullable: true, example: เอกสารทีม dev }
+        createdAt: { type: string, format: date-time, example: '2026-10-01T09:00:00Z' }
+    CreateSpaceRequest:
+      type: object
+      required: [key, name]
+      properties:
+        key: { type: string, pattern: '^[A-Z][A-Z0-9]{1,9}$', example: ENG }
+        name: { type: string, minLength: 1, pattern: '\S', maxLength: 100, example: Engineering }
+        description: { type: string, nullable: true }
+
+    PageSummary:
+      type: object
+      required: [id, spaceKey, title, updatedAt]
+      properties:
+        id: { type: string, format: uuid, example: 5e6f7081-0000-4000-8000-000000000001 }
+        spaceKey: { type: string, example: ENG }
+        title: { type: string, example: Board Spec }
+        updatedAt: { type: string, format: date-time, example: '2026-10-04T12:00:00Z' }
+    PageTreeNode:
+      type: object
+      required: [id, title, children]
+      properties:
+        id: { type: string, format: uuid, example: 5e6f7081-0000-4000-8000-000000000001 }
+        title: { type: string, example: Board Spec }
+        children:
+          type: array
+          items: { $ref: '#/components/schemas/PageTreeNode' }
+          example: []
+    Page:
+      type: object
+      required: [id, spaceKey, parentId, title, contentMd, author, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid, example: 5e6f7081-0000-4000-8000-000000000001 }
+        spaceKey: { type: string, example: ENG }
+        parentId: { type: string, format: uuid, nullable: true, example: null }
+        title: { type: string, example: Board Spec }
+        contentMd:
+          type: string
+          description: Markdown — ข้อความรูปแบบ `TB-12` ให้ FE render เป็นลิงก์ไป issue
+          example: "# Board Spec\n\nคอลัมน์: TODO / IN_PROGRESS / IN_REVIEW / DONE\n\nงานหลักอยู่ที่ TB-12"
+        author: { $ref: '#/components/schemas/User' }
+        createdAt: { type: string, format: date-time, example: '2026-10-02T09:00:00Z' }
+        updatedAt: { type: string, format: date-time, example: '2026-10-04T12:00:00Z' }
+    CreatePageRequest:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1, pattern: '\S', maxLength: 200, example: Board Spec }
+        parentId: { type: string, format: uuid, nullable: true }
+        contentMd: { type: string, default: '' }
+    UpdatePageRequest:
+      type: object
+      minProperties: 1
+      properties:
+        title: { type: string, minLength: 1, pattern: '\S', maxLength: 200 }
+        contentMd: { type: string }
+        parentId: { type: string, format: uuid, nullable: true }
+
+    SearchResult:
+      type: object
+      required: [issues, pages]
+      properties:
+        issues:
+          type: array
+          items: { $ref: '#/components/schemas/IssueSummary' }
+        pages:
+          type: array
+          items: { $ref: '#/components/schemas/PageSummary' }

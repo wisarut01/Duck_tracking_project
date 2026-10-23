@@ -1,0 +1,447 @@
+/*
+ * Tracking Board — Design tokens (ตรงกับ web/DESIGN.md)
+ *
+ * โครงสร้าง:
+ *   1) :root / .dark  = ค่าสีจริง (CSS variables) แยก light / dark
+ *   2) @theme inline  = บอก Tailwind ว่ามี utility อะไรบ้าง เช่น bg-canvas, text-ink, bg-sticky-blue
+ *      (ใช้ `inline` เพื่อให้ Tailwind ใส่ var(--tb-...) ลงไปตรงๆ → สลับ dark mode ได้ทันทีโดยไม่ต้อง build ใหม่)
+ *
+ * Dark mode: ใส่ class `dark` ที่ <html> (Storybook toolbar ทำให้อัตโนมัติ)
+ */
+@import 'tailwindcss';
+
+/* ฟอนต์: Plus Jakarta Sans (Latin) + IBM Plex Sans Thai (ภาษาไทย) — โหลดจาก @fontsource ไม่ต้องพึ่ง CDN */
+@import '@fontsource-variable/plus-jakarta-sans';
+@import '@fontsource/ibm-plex-sans-thai/400.css';
+@import '@fontsource/ibm-plex-sans-thai/500.css';
+@import '@fontsource/ibm-plex-sans-thai/600.css';
+@import '@fontsource/ibm-plex-sans-thai/700.css';
+
+/* ทำให้ `dark:` ของ Tailwind ทำงานตาม class .dark (ไม่ใช่ตาม OS) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  /* — Surfaces — */
+  --tb-canvas: #f7f5f0;
+  --tb-surface: #ffffff;
+  --tb-surface-muted: #f1eee7;
+  --tb-surface-sunken: #ebe7de;
+  --tb-overlay: rgb(28 28 30 / 0.4);
+  --tb-dot: #d9d3c5;
+
+  /* — Lines — */
+  --tb-border: #e6e1d6;
+  --tb-border-strong: #cfc8b8;
+
+  /* — Text — */
+  --tb-ink: #1c1c1e;
+  --tb-ink-muted: #5c5a55;
+  --tb-ink-subtle: #67635a;
+  --tb-ink-inverse: #ffffff;
+
+  /* — Brand — */
+  --tb-brand: #ffd02f;
+  --tb-brand-hover: #f5c200;
+  --tb-brand-soft: #fff4b8;
+  --tb-brand-ink: #1c1c1e;
+  --tb-link: #3654e6;
+  --tb-focus: #3654e6;
+
+  /* — Feedback — */
+  --tb-success: #1c7f45;
+  --tb-success-soft: #d3f5dc;
+  --tb-warning: #9a5b00;
+  --tb-warning-soft: #ffe8c2;
+  --tb-danger: #b3232e;
+  --tb-danger-soft: #ffdde0;
+  --tb-info: #2a5bd7;
+  --tb-info-soft: #d6e6ff;
+
+  /* — Sticky-note pastels (พื้น) + ink (ตัวอักษร/ไอคอนบนพื้นนั้น) — */
+  --tb-sticky-yellow: #fff4b8;
+  --tb-sticky-yellow-ink: #6b4f00;
+  --tb-sticky-pink: #ffd6e0;
+  --tb-sticky-pink-ink: #9c1f45;
+  --tb-sticky-green: #d3f5dc;
+  --tb-sticky-green-ink: #1a6334;
+  --tb-sticky-blue: #d6e6ff;
+  --tb-sticky-blue-ink: #1e4bb0;
+  --tb-sticky-purple: #e6dcff;
+  --tb-sticky-purple-ink: #5534b8;
+  --tb-sticky-orange: #ffe2c6;
+  --tb-sticky-orange-ink: #8f4300;
+  --tb-sticky-teal: #cff3ee;
+  --tb-sticky-teal-ink: #0d6158;
+  --tb-sticky-gray: #eceae4;
+  --tb-sticky-gray-ink: #4d4a44;
+
+  /* — Shadows (นุ่ม โทนอุ่น) — */
+  --tb-shadow-sm: 0 1px 2px rgb(60 50 30 / 0.06), 0 1px 1px rgb(60 50 30 / 0.04);
+  --tb-shadow-md: 0 4px 12px rgb(60 50 30 / 0.08), 0 1px 3px rgb(60 50 30 / 0.06);
+  --tb-shadow-lg: 0 12px 32px rgb(60 50 30 / 0.12), 0 2px 6px rgb(60 50 30 / 0.06);
+  --tb-shadow-lift: 0 18px 40px rgb(60 50 30 / 0.18), 0 4px 10px rgb(60 50 30 / 0.08);
+
+  color-scheme: light;
+}
+
+.dark {
+  --tb-canvas: #17171a;
+  --tb-surface: #212126;
+  --tb-surface-muted: #2a2a30;
+  --tb-surface-sunken: #1c1c20;
+  --tb-overlay: rgb(0 0 0 / 0.6);
+  --tb-dot: #303037;
+
+  --tb-border: #34343b;
+  --tb-border-strong: #4a4a53;
+
+  --tb-ink: #f4f2ec;
+  --tb-ink-muted: #b4b0a6;
+  --tb-ink-subtle: #9e9a90;
+  --tb-ink-inverse: #1c1c1e;
+
+  --tb-brand: #ffd02f;
+  --tb-brand-hover: #ffdc5e;
+  --tb-brand-soft: #4a4120;
+  --tb-brand-ink: #1c1c1e;
+  --tb-link: #8fa8ff;
+  --tb-focus: #8fa8ff;
+
+  --tb-success: #7fdc9c;
+  --tb-success-soft: #22402c;
+  --tb-warning: #ffc070;
+  --tb-warning-soft: #4a3322;
+  --tb-danger: #ff8f97;
+  --tb-danger-soft: #4d2429;
+  --tb-info: #9dbcff;
+  --tb-info-soft: #24344f;
+
+  --tb-sticky-yellow: #4a4120;
+  --tb-sticky-yellow-ink: #ffe58a;
+  --tb-sticky-pink: #4a2a33;
+  --tb-sticky-pink-ink: #ffb3c6;
+  --tb-sticky-green: #22402c;
+  --tb-sticky-green-ink: #9be3b0;
+  --tb-sticky-blue: #24344f;
+  --tb-sticky-blue-ink: #a9c8ff;
+  --tb-sticky-purple: #352c4d;
+  --tb-sticky-purple-ink: #cdbbff;
+  --tb-sticky-orange: #4a3322;
+  --tb-sticky-orange-ink: #ffc08a;
+  --tb-sticky-teal: #1f413d;
+  --tb-sticky-teal-ink: #8fe3d7;
+  --tb-sticky-gray: #2e2d2a;
+  --tb-sticky-gray-ink: #cfcbc1;
+
+  --tb-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --tb-shadow-md: 0 4px 12px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.25);
+  --tb-shadow-lg: 0 12px 32px rgb(0 0 0 / 0.45), 0 2px 6px rgb(0 0 0 / 0.3);
+  --tb-shadow-lift: 0 18px 40px rgb(0 0 0 / 0.55), 0 4px 10px rgb(0 0 0 / 0.35);
+
+  color-scheme: dark;
+}
+
+/* Tailwind theme — ชื่อ utility ที่ใช้ใน component */
+@theme inline {
+  --font-sans: 'Plus Jakarta Sans Variable', 'IBM Plex Sans Thai', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  --color-canvas: var(--tb-canvas);
+  --color-surface: var(--tb-surface);
+  --color-surface-muted: var(--tb-surface-muted);
+  --color-surface-sunken: var(--tb-surface-sunken);
+  --color-overlay: var(--tb-overlay);
+  --color-dot: var(--tb-dot);
+  --color-border: var(--tb-border);
+  --color-border-strong: var(--tb-border-strong);
+
+  --color-ink: var(--tb-ink);
+  --color-ink-muted: var(--tb-ink-muted);
+  --color-ink-subtle: var(--tb-ink-subtle);
+  --color-ink-inverse: var(--tb-ink-inverse);
+
+  --color-brand: var(--tb-brand);
+  --color-brand-hover: var(--tb-brand-hover);
+  --color-brand-soft: var(--tb-brand-soft);
+  --color-brand-ink: var(--tb-brand-ink);
+  --color-link: var(--tb-link);
+  --color-focus: var(--tb-focus);
+
+  --color-success: var(--tb-success);
+  --color-success-soft: var(--tb-success-soft);
+  --color-warning: var(--tb-warning);
+  --color-warning-soft: var(--tb-warning-soft);
+  --color-danger: var(--tb-danger);
+  --color-danger-soft: var(--tb-danger-soft);
+  --color-info: var(--tb-info);
+  --color-info-soft: var(--tb-info-soft);
+
+  --color-sticky-yellow: var(--tb-sticky-yellow);
+  --color-sticky-yellow-ink: var(--tb-sticky-yellow-ink);
+  --color-sticky-pink: var(--tb-sticky-pink);
+  --color-sticky-pink-ink: var(--tb-sticky-pink-ink);
+  --color-sticky-green: var(--tb-sticky-green);
+  --color-sticky-green-ink: var(--tb-sticky-green-ink);
+  --color-sticky-blue: var(--tb-sticky-blue);
+  --color-sticky-blue-ink: var(--tb-sticky-blue-ink);
+  --color-sticky-purple: var(--tb-sticky-purple);
+  --color-sticky-purple-ink: var(--tb-sticky-purple-ink);
+  --color-sticky-orange: var(--tb-sticky-orange);
+  --color-sticky-orange-ink: var(--tb-sticky-orange-ink);
+  --color-sticky-teal: var(--tb-sticky-teal);
+  --color-sticky-teal-ink: var(--tb-sticky-teal-ink);
+  --color-sticky-gray: var(--tb-sticky-gray);
+  --color-sticky-gray-ink: var(--tb-sticky-gray-ink);
+
+  /* Radius: sm 6 · md 8 · lg 12 · xl 16 · 2xl 20 */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+
+  --shadow-sm: var(--tb-shadow-sm);
+  --shadow-md: var(--tb-shadow-md);
+  --shadow-lg: var(--tb-shadow-lg);
+  --shadow-lift: var(--tb-shadow-lift);
+
+  /* Type scale (font-size / line-height) */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.1rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.35rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.6rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 2rem;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.4rem;
+  --text-3xl: 2.25rem;
+  --text-3xl--line-height: 2.9rem;
+}
+
+/* — Base — */
+@layer base {
+  html,
+  body {
+    background-color: var(--tb-canvas);
+    color: var(--tb-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* focus ring ที่มองเห็นชัด เฉพาะตอนใช้คีย์บอร์ด (focus-visible) */
+  :focus-visible {
+    outline: 2px solid var(--tb-focus);
+    outline-offset: 2px;
+  }
+}
+
+/* — Utilities เฉพาะโปรเจกต์ — */
+@utility bg-dot-grid {
+  /* พื้นหลังแบบ whiteboard: จุดเล็กๆ ทุก 20px */
+  background-color: var(--tb-canvas);
+  background-image: radial-gradient(var(--tb-dot) 1.2px, transparent 1.2px);
+  background-size: 20px 20px;
+}
+
+@keyframes tb-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@utility animate-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--tb-surface-muted) 0%,
+    var(--tb-surface-sunken) 50%,
+    var(--tb-surface-muted) 100%
+  );
+  background-size: 200% 100%;
+  animation: tb-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes tb-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@utility animate-pop-in {
+  animation: tb-pop-in 160ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/*
+ * — Markdown (MarkdownView) —
+ * เขียน CSS ตรงๆ สำหรับ HTML ที่ react-markdown สร้าง (เราใส่ class ให้ทีละ tag ไม่ได้)
+ */
+@layer components {
+  .tb-markdown {
+    color: var(--tb-ink);
+    font-size: var(--text-base);
+    line-height: 1.75;
+    overflow-wrap: anywhere;
+  }
+  .tb-markdown > * + * {
+    margin-top: 0.85em;
+  }
+  .tb-markdown h1 {
+    font-size: var(--text-2xl);
+    line-height: 1.3;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin-top: 0;
+  }
+  .tb-markdown h2 {
+    font-size: var(--text-xl);
+    line-height: 1.35;
+    font-weight: 800;
+    margin-top: 1.6em;
+  }
+  .tb-markdown h3 {
+    font-size: var(--text-lg);
+    font-weight: 700;
+    margin-top: 1.4em;
+  }
+  .tb-markdown a:not([data-issue-key]):not([href^='/issues/']) {
+    color: var(--tb-link);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .tb-markdown strong {
+    font-weight: 700;
+  }
+  .tb-markdown ul {
+    list-style: disc;
+    padding-left: 1.4em;
+  }
+  .tb-markdown ol {
+    list-style: decimal;
+    padding-left: 1.4em;
+  }
+  .tb-markdown li + li {
+    margin-top: 0.25em;
+  }
+  .tb-markdown li::marker {
+    color: var(--tb-ink-subtle);
+  }
+  /* GFM checklist: ไม่ต้องมี bullet */
+  .tb-markdown ul:has(> li > input[type='checkbox']) {
+    list-style: none;
+    padding-left: 0.2em;
+  }
+  .tb-markdown input[type='checkbox'] {
+    accent-color: var(--tb-brand-hover);
+    margin-right: 0.5em;
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.12em;
+  }
+  .tb-markdown blockquote {
+    border-left: 4px solid var(--tb-brand);
+    background: var(--tb-brand-soft);
+    padding: 0.6em 1em;
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    color: var(--tb-ink);
+  }
+  .tb-markdown code {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    background: var(--tb-surface-muted);
+    border: 1px solid var(--tb-border);
+    padding: 0.1em 0.35em;
+    border-radius: var(--radius-sm);
+  }
+  .tb-markdown pre {
+    background: var(--tb-surface-sunken);
+    border: 1px solid var(--tb-border);
+    border-radius: var(--radius-lg);
+    padding: 1em 1.2em;
+    overflow-x: auto;
+    line-height: 1.6;
+  }
+  .tb-markdown pre code {
+    background: none;
+    border: 0;
+    padding: 0;
+  }
+  .tb-markdown table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--tb-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    font-size: var(--text-sm);
+  }
+  .tb-markdown th {
+    background: var(--tb-surface-muted);
+    font-weight: 700;
+    text-align: left;
+  }
+  .tb-markdown th,
+  .tb-markdown td {
+    padding: 0.5em 0.85em;
+    border-bottom: 1px solid var(--tb-border);
+  }
+  .tb-markdown tr:last-child td {
+    border-bottom: 0;
+  }
+  .tb-markdown hr {
+    border: 0;
+    border-top: 2px dashed var(--tb-border-strong);
+  }
+  .tb-markdown--compact {
+    font-size: var(--text-sm);
+    line-height: 1.65;
+  }
+  .tb-markdown--compact > * + * {
+    margin-top: 0.5em;
+  }
+}
+
+/* — หน้า Introduction ใน Storybook — */
+.tb-docs-hero {
+  border-radius: 20px;
+  border: 1px solid var(--tb-border);
+  padding: 32px;
+  margin-bottom: 24px;
+  color: var(--tb-ink);
+}
+.tb-docs-hero h1 {
+  font-size: 2rem !important;
+  font-weight: 800 !important;
+  margin: 16px 0 4px !important;
+  border: 0 !important;
+  color: var(--tb-ink) !important;
+}
+.tb-docs-hero p {
+  color: var(--tb-ink-muted) !important;
+}
+.tb-docs-hero-cards {
+  display: flex;
+  gap: 24px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}

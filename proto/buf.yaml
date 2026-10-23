@@ -1,0 +1,12 @@
+# buf config — https://buf.build/docs/configuration/v2/buf-yaml
+# Run from this folder:  buf lint   |   buf generate   |   buf breaking --against '../.git#subdir=proto'
+# (No buf installed? `npx @bufbuild/buf lint` works too.)
+version: v2
+modules:
+  - path: .
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE

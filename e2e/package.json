@@ -1,0 +1,22 @@
+{
+  "name": "tracking-board-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "QA: API contract tests (vs api/openapi.yaml) + Storybook smoke tests + E2E (Phase 2)",
+  "scripts": {
+    "test:api": "playwright test --project=api",
+    "test:ui": "playwright test --project=ui",
+    "test": "playwright test",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit",
+    "list": "playwright test --list"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^26.6.5",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "typescript": "^7.0.2",
+    "yaml": "^2.9.1"
+  }
+}

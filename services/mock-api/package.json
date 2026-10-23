@@ -1,0 +1,23 @@
+{
+  "name": "tracking-board-mock-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Stateful in-memory mock of the Tracking Board REST API (api/openapi.yaml)",
+  "type": "module",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "smoke": "node scripts/smoke.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "express-openapi-validator": "^5.6.2",
+    "jsonwebtoken": "^9.0.3",
+    "yaml": "^2.9.1"
+  }
+}

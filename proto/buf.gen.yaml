@@ -1,0 +1,26 @@
+# Code generation — https://buf.build/docs/configuration/v2/buf-gen-yaml
+#   cd proto && buf generate
+# Uses buf's remote plugins, so you don't need protoc / protoc-gen-go installed.
+#   Go     → ../gen/go       (gateway, auth-service, tracker-service)
+#   Python → ../gen/python   (docs-service)
+version: v2
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/duck/tracking_board/gen/go
+plugins:
+  # Go: messages + gRPC client/server stubs
+  - remote: buf.build/protocolbuffers/go
+    out: ../gen/go
+    opt: paths=source_relative
+  - remote: buf.build/grpc/go
+    out: ../gen/go
+    opt: paths=source_relative
+  # Python: messages, type hints (.pyi) and gRPC stubs
+  - remote: buf.build/protocolbuffers/python
+    out: ../gen/python
+  - remote: buf.build/protocolbuffers/pyi
+    out: ../gen/python
+  - remote: buf.build/grpc/python
+    out: ../gen/python

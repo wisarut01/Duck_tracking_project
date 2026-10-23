@@ -1,0 +1,71 @@
+// auth-service (Go) — users, passwords, JWT.
+// Port: 50051. See proto/README.md for which REST endpoint calls which RPC.
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "github.com/duck/tracking_board/gen/go/auth/v1;authv1";
+
+service AuthService {
+  // POST /auth/register
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  // POST /auth/login
+  rpc Login(LoginRequest) returns (LoginResponse);
+  // Called by the gateway on EVERY authenticated request (Bearer token → user).
+  // Unauthenticated if the token is invalid/expired.
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+  // GET /auth/me (the gateway already knows the user id from ValidateToken)
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  // GET /users  — and also used by the gateway to "hydrate" user ids coming from
+  // tracker/docs (assignee, reporter, author) into full User objects in ONE call.
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+}
+
+message User {
+  string id = 1; // UUID
+  string email = 2;
+  string display_name = 3;
+  optional string avatar_url = 4; // not set = null in JSON
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2; // min 8 chars
+  string display_name = 3; // 1..50 chars
+}
+message RegisterResponse {
+  string access_token = 1;
+  User user = 2;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+message LoginResponse {
+  string access_token = 1;
+  User user = 2;
+}
+
+message ValidateTokenRequest {
+  string access_token = 1;
+}
+message ValidateTokenResponse {
+  User user = 1;
+}
+
+message GetUserRequest {
+  string id = 1;
+}
+message GetUserResponse {
+  User user = 1;
+}
+
+message ListUsersRequest {
+  // Empty = all users (GET /users). Non-empty = only these ids (hydration).
+  // Unknown ids are skipped, not an error.
+  repeated string ids = 1;
+}
+message ListUsersResponse {
+  repeated User users = 1;
+}

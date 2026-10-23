@@ -1,0 +1,51 @@
+# Local dev stack (Phase 1 = demo backend).
+#   make up    → mock-api on :4010 + Swagger UI on :8081
+#   make down  → stop everything
+#
+# Later (Phase 2) the real gateway + services + postgres will be added here.
+# postgres is already sketched below behind a profile, so it does NOT start by default:
+#   docker compose --profile db up -d postgres
+
+services:
+  mock-api:
+    build: ./services/mock-api
+    ports:
+      - "4010:4010"
+    volumes:
+      - ./api:/spec:ro          # the mock validates requests against this file
+    environment:
+      CORS_ORIGINS: http://localhost:5173,http://localhost:6006,http://localhost:8081
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4010/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui:v5.17.14
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./api:/spec:ro
+    environment:
+      SWAGGER_JSON: /spec/openapi.yaml   # "Try it out" uses the spec's servers list (mock :4010 first)
+      PERSIST_AUTHORIZATION: "true"      # keep the Bearer token after a page reload
+    depends_on:
+      - mock-api
+
+  # --- Phase 2: one Postgres instance, one database per service ---
+  postgres:
+    profiles: ["db"]
+    image: postgres:17-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: tb
+      POSTGRES_PASSWORD: tb
+      POSTGRES_DB: tb
+      # TODO(phase 2): init script creating auth_db / tracker_db / docs_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

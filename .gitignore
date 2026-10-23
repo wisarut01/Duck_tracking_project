@@ -1,0 +1,7 @@
+node_modules/
+/gen/
+dist/
+storybook-static/
+.env
+e2e/test-results/
+e2e/playwright-report/

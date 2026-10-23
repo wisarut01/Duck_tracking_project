@@ -1,0 +1,262 @@
+// tracker-service (Go) — projects, issues, comments, and the issue_page_links table.
+// Port: 50052. See proto/README.md for which REST endpoint calls which RPC.
+//
+// Users are referenced by id only (assignee_id, reporter_id, author_id).
+// The gateway turns ids into full User objects with auth.v1.AuthService/ListUsers.
+syntax = "proto3";
+
+package tracker.v1;
+
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/duck/tracking_board/gen/go/tracker/v1;trackerv1";
+
+service TrackerService {
+  // ---- projects ----
+  rpc ListProjects(ListProjectsRequest) returns (ListProjectsResponse);
+  rpc CreateProject(CreateProjectRequest) returns (CreateProjectResponse);
+  rpc GetProject(GetProjectRequest) returns (GetProjectResponse);
+
+  // ---- issues ----
+  rpc ListIssues(ListIssuesRequest) returns (ListIssuesResponse);
+  rpc CreateIssue(CreateIssueRequest) returns (CreateIssueResponse);
+  rpc GetIssue(GetIssueRequest) returns (GetIssueResponse);
+  rpc UpdateIssue(UpdateIssueRequest) returns (UpdateIssueResponse);
+  rpc DeleteIssue(DeleteIssueRequest) returns (DeleteIssueResponse);
+  rpc MoveIssue(MoveIssueRequest) returns (MoveIssueResponse);
+  rpc SearchIssues(SearchIssuesRequest) returns (SearchIssuesResponse);
+
+  // ---- comments ----
+  rpc ListComments(ListCommentsRequest) returns (ListCommentsResponse);
+  rpc CreateComment(CreateCommentRequest) returns (CreateCommentResponse);
+
+  // ---- issue <-> page links (tracker owns issue_page_links) ----
+  // Pages live in docs-service, so tracker only stores/returns page ids.
+  rpc ListIssueLinks(ListIssueLinksRequest) returns (ListIssueLinksResponse);
+  rpc CreateIssueLink(CreateIssueLinkRequest) returns (CreateIssueLinkResponse);
+  rpc DeleteIssueLink(DeleteIssueLinkRequest) returns (DeleteIssueLinkResponse);
+  rpc ListPageLinkedIssues(ListPageLinkedIssuesRequest) returns (ListPageLinkedIssuesResponse);
+  // Called by the gateway after docs.DeletePage, so no link points at a deleted page.
+  rpc DeletePageLinks(DeletePageLinksRequest) returns (DeletePageLinksResponse);
+}
+
+// ======================= enums =======================
+// proto3 enums must start with an *_UNSPECIFIED = 0 value.
+// REST uses the name without the prefix: ISSUE_STATUS_IN_REVIEW <-> "IN_REVIEW".
+
+enum IssueType {
+  ISSUE_TYPE_UNSPECIFIED = 0;
+  ISSUE_TYPE_TASK = 1;
+  ISSUE_TYPE_BUG = 2;
+  ISSUE_TYPE_STORY = 3;
+}
+
+enum IssueStatus {
+  ISSUE_STATUS_UNSPECIFIED = 0;
+  ISSUE_STATUS_TODO = 1;
+  ISSUE_STATUS_IN_PROGRESS = 2;
+  ISSUE_STATUS_IN_REVIEW = 3;
+  ISSUE_STATUS_DONE = 4;
+}
+
+enum IssuePriority {
+  ISSUE_PRIORITY_UNSPECIFIED = 0; // on create: treated as MEDIUM
+  ISSUE_PRIORITY_LOWEST = 1;
+  ISSUE_PRIORITY_LOW = 2;
+  ISSUE_PRIORITY_MEDIUM = 3;
+  ISSUE_PRIORITY_HIGH = 4;
+  ISSUE_PRIORITY_HIGHEST = 5;
+}
+
+// ======================= resources =======================
+
+message Project {
+  string id = 1;
+  string key = 2; // e.g. "TB"
+  string name = 3;
+  optional string description = 4;
+  string lead_id = 5;
+  int32 issue_count = 6;
+  google.protobuf.Timestamp create_time = 7;
+}
+
+message Issue {
+  string id = 1;
+  string key = 2; // e.g. "TB-12"
+  string project_key = 3;
+  string title = 4;
+  optional string description = 5; // Markdown
+  IssueType type = 6;
+  IssueStatus status = 7;
+  IssuePriority priority = 8;
+  optional string assignee_id = 9; // not set = unassigned (null)
+  string reporter_id = 10;
+  double position = 11; // order inside the column, smaller = higher
+  repeated string labels = 12;
+  int32 linked_page_count = 13;
+  google.protobuf.Timestamp create_time = 14;
+  google.protobuf.Timestamp update_time = 15;
+}
+
+message Comment {
+  string id = 1;
+  string issue_key = 2;
+  string author_id = 3;
+  string body = 4; // Markdown
+  google.protobuf.Timestamp create_time = 5;
+}
+
+// ======================= projects =======================
+
+message ListProjectsRequest {}
+message ListProjectsResponse {
+  repeated Project projects = 1;
+}
+
+message CreateProjectRequest {
+  string key = 1; // ^[A-Z][A-Z0-9]{1,9}$
+  string name = 2;
+  optional string description = 3;
+  string lead_id = 4; // the gateway passes the current user id
+}
+message CreateProjectResponse {
+  Project project = 1;
+}
+
+message GetProjectRequest {
+  string key = 1;
+}
+message GetProjectResponse {
+  Project project = 1;
+}
+
+// ======================= issues =======================
+
+message ListIssuesRequest {
+  string project_key = 1;
+  optional IssueStatus status = 2;
+  optional string assignee_id = 3;
+  optional string q = 4; // substring of title, case-insensitive
+  int32 page = 5; // 1-based, 0 = default (1)
+  int32 page_size = 6; // 0 = default (50), max 200
+}
+message ListIssuesResponse {
+  repeated Issue issues = 1; // sorted by status, then position
+  int32 page = 2;
+  int32 page_size = 3;
+  int32 total = 4;
+}
+
+message CreateIssueRequest {
+  string project_key = 1;
+  string title = 2;
+  IssueType type = 3;
+  optional string description = 4;
+  IssuePriority priority = 5;
+  optional string assignee_id = 6;
+  repeated string labels = 7;
+  string reporter_id = 8; // the gateway passes the current user id
+}
+message CreateIssueResponse {
+  Issue issue = 1; // status = TODO, key = next number in the project
+}
+
+message GetIssueRequest {
+  string key = 1;
+}
+message GetIssueResponse {
+  Issue issue = 1;
+}
+
+// PATCH semantics: only fields listed in update_mask are changed.
+// Allowed paths: title, description, type, priority, assignee_id, labels.
+// A path in the mask whose field is not set means "set to null/empty"
+// (e.g. mask ["assignee_id"] + no assignee_id = unassign).
+message UpdateIssueRequest {
+  string key = 1;
+  Issue issue = 2; // only the masked fields are read
+  google.protobuf.FieldMask update_mask = 3;
+}
+message UpdateIssueResponse {
+  Issue issue = 1;
+}
+
+message DeleteIssueRequest {
+  string key = 1; // also deletes its comments and links
+}
+message DeleteIssueResponse {}
+
+// Drag & drop: put the issue in column `status`, between after_key (above)
+// and before_key (below). Not set = top/bottom of the column. The service
+// computes the new `position`.
+message MoveIssueRequest {
+  string key = 1;
+  IssueStatus status = 2;
+  optional string after_key = 3;
+  optional string before_key = 4;
+}
+message MoveIssueResponse {
+  Issue issue = 1;
+}
+
+message SearchIssuesRequest {
+  string q = 1; // matches key, title, description, labels
+  int32 limit = 2; // 0 = default (20)
+}
+message SearchIssuesResponse {
+  repeated Issue issues = 1;
+}
+
+// ======================= comments =======================
+
+message ListCommentsRequest {
+  string issue_key = 1;
+}
+message ListCommentsResponse {
+  repeated Comment comments = 1; // oldest first
+}
+
+message CreateCommentRequest {
+  string issue_key = 1;
+  string author_id = 2; // the gateway passes the current user id
+  string body = 3;
+}
+message CreateCommentResponse {
+  Comment comment = 1;
+}
+
+// ======================= links =======================
+
+message ListIssueLinksRequest {
+  string issue_key = 1;
+}
+message ListIssueLinksResponse {
+  repeated string page_ids = 1; // gateway → docs.BatchGetPages for titles
+}
+
+message CreateIssueLinkRequest {
+  string issue_key = 1;
+  string page_id = 2; // gateway checks the page exists in docs-service first
+}
+message CreateIssueLinkResponse {}
+
+message DeleteIssueLinkRequest {
+  string issue_key = 1;
+  string page_id = 2;
+}
+message DeleteIssueLinkResponse {}
+
+message ListPageLinkedIssuesRequest {
+  string page_id = 1;
+}
+message ListPageLinkedIssuesResponse {
+  repeated Issue issues = 1;
+}
+
+message DeletePageLinksRequest {
+  repeated string page_ids = 1;
+}
+message DeletePageLinksResponse {
+  int32 deleted_count = 1;
+}

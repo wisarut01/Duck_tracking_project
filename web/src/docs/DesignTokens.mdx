@@ -1,0 +1,62 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+import {
+  BrandSwatches,
+  FeedbackSwatches,
+  IssueMapping,
+  RadiusAndShadow,
+  StickySwatches,
+  SurfaceSwatches,
+  ThemeSwitch,
+  TokenCanvas,
+  TextSwatches,
+  TypeScale,
+} from './TokenTables';
+
+<Meta title="Design Tokens" />
+
+# Design Tokens
+
+ค่าทั้งหมดอยู่ที่ `src/styles/index.css` (CSS variables `--tb-*` + `@theme inline` ของ Tailwind v4)
+ตัวเลข hex ด้านล่างอ่านจาก CSS จริง — **กดสลับ Light / Dark ตรงนี้แล้วค่าจะเปลี่ยนตาม**
+
+<ThemeSwitch />
+
+ใช้ใน component ผ่าน Tailwind utility เช่น `bg-canvas`, `text-ink-muted`, `bg-sticky-blue`, `text-sticky-blue-ink`, `shadow-lift`
+
+## Surfaces & lines
+
+<TokenCanvas><SurfaceSwatches /></TokenCanvas>
+
+## Text
+
+<TokenCanvas><TextSwatches /></TokenCanvas>
+
+## Brand
+
+<TokenCanvas><BrandSwatches /></TokenCanvas>
+
+## Feedback
+
+<TokenCanvas><FeedbackSwatches /></TokenCanvas>
+
+## Sticky-note pastels
+
+พื้น (`bg-sticky-*`) + สีตัวอักษร/ไอคอนบนพื้นนั้น (`text-sticky-*-ink`) — ทุกคู่ผ่าน contrast ≥ 4.5:1
+
+<TokenCanvas><StickySwatches /></TokenCanvas>
+
+## Typography
+
+ฟอนต์: **Plus Jakarta Sans Variable** (Latin) → **IBM Plex Sans Thai** (ภาษาไทย) → system-ui
+
+<TokenCanvas><TypeScale /></TokenCanvas>
+
+## Radius & Shadow
+
+<TokenCanvas><RadiusAndShadow /></TokenCanvas>
+
+## Issue visual mapping
+
+สี + ไอคอน + ข้อความ เสมอ (ไม่ใช้สีอย่างเดียว)
+
+<TokenCanvas><IssueMapping /></TokenCanvas>

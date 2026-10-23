@@ -1,0 +1,49 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+import { MemoryRouter } from 'react-router';
+import { IssueCard } from '../components/issues/IssueCard';
+import { IssueMentionChip } from '../components/issues/IssueMentionChip';
+import { Logo } from '../components/layout/Logo';
+import { findIssueByKey, issues } from '../mocks/fixtures';
+
+<Meta title="Introduction" />
+
+<div className="sb-unstyled tb-docs-hero bg-dot-grid">
+  <Logo />
+  <h1>Tracking Board — Design System</h1>
+  <p>issue tracker + docs ในที่เดียว หน้าตาเหมือน whiteboard ที่มี sticky note แปะอยู่</p>
+  <div className="tb-docs-hero-cards">
+    <div style={{ width: 230 }} className="-rotate-2"><IssueCard issue={issues[11]} /></div>
+    <div style={{ width: 230 }} className="rotate-2"><IssueCard issue={issues[3]} /></div>
+  </div>
+</div>
+
+## Storybook นี้มีอะไร
+
+- **Design Tokens** — สี light/dark, sticky pastels, type scale, radius, shadow, การ map type/status/priority
+- **Primitives** — Button, Input, TextArea, Select, Badge, Avatar(+Group), Modal, Tooltip, Toast, EmptyState, Skeleton
+- **Domain** — IssueTypeIcon, PriorityIcon, StatusPill, IssueCard, BoardColumn, KanbanBoard, IssueDetailPanel, CreateIssueModal, IssueMentionChip, SearchBar, CommandPalette
+- **Docs** — PageTree, MarkdownView, PageEditor, LinkedIssuesPanel
+- **Layout** — Sidebar, TopBar, AppShell
+- **Screens** — Login, ProjectBoard, IssueDetail, DocsPage, SearchResults
+
+## วิธีใช้
+
+- **สลับธีม**: ปุ่ม 🖌 (Theme) บน toolbar ด้านบน → `light` / `dark`
+- **Accessibility**: แท็บ *Accessibility* ด้านล่างของแต่ละ story (axe-core)
+- **Controls**: ปรับ props สดๆ ในแท็บ *Controls*
+- **Actions**: event เช่น `onMoveIssue` จะขึ้นในแท็บ *Actions*
+
+## หลักการออกแบบ (สั้นๆ)
+
+- **Canvas อุ่น ไม่ใช่ขาวจั๊วะ** — พื้น off-white + dot-grid บนพื้นที่แบบ board
+- **เหลืองเดียว** — `brand` ใช้กับ action หลัก / สิ่งที่ active เท่านั้น
+- **Sticky pastel = หมวดหมู่** — ฟ้า Task, ชมพู Bug, เขียว Story
+- **สีไม่เคยมาเดี่ยว** — ทุกสีมีไอคอน + ข้อความคู่กันเสมอ
+- **มุมมน เงานุ่ม ตัวหนาเป็นมิตร** — Plus Jakarta Sans + IBM Plex Sans Thai
+
+{/* หน้า MDX ไม่ได้ผ่าน decorator ของ story → ต้องครอบ Router เอง เพราะ chip ใช้ <Link> */}
+<MemoryRouter>
+  ข้อความอย่าง TB-12 ในเอกสารจะกลายเป็นชิป <IssueMentionChip issueKey="TB-12" issue={findIssueByKey('TB-12')} /> ที่คลิกไปหน้า issue ได้
+</MemoryRouter>
+
+รายละเอียดทั้งหมดอยู่ที่ `web/DESIGN.md`

@@ -1,0 +1,152 @@
+// docs-service (Python grpcio + SQLAlchemy) — spaces and the page tree.
+// Port: 50053. See proto/README.md for which REST endpoint calls which RPC.
+//
+// Authors are referenced by id only (author_id); the gateway hydrates them
+// with auth.v1.AuthService/ListUsers. Issue links live in tracker-service.
+syntax = "proto3";
+
+package docs.v1;
+
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/duck/tracking_board/gen/go/docs/v1;docsv1";
+
+service DocsService {
+  // ---- spaces ----
+  rpc ListSpaces(ListSpacesRequest) returns (ListSpacesResponse);
+  rpc CreateSpace(CreateSpaceRequest) returns (CreateSpaceResponse);
+  rpc GetSpace(GetSpaceRequest) returns (GetSpaceResponse);
+
+  // ---- pages ----
+  rpc GetPageTree(GetPageTreeRequest) returns (GetPageTreeResponse);
+  rpc CreatePage(CreatePageRequest) returns (CreatePageResponse);
+  rpc GetPage(GetPageRequest) returns (GetPageResponse);
+  rpc UpdatePage(UpdatePageRequest) returns (UpdatePageResponse);
+  rpc DeletePage(DeletePageRequest) returns (DeletePageResponse);
+  // Used by the gateway to turn page ids from tracker (links) into PageSummary.
+  rpc BatchGetPages(BatchGetPagesRequest) returns (BatchGetPagesResponse);
+  rpc SearchPages(SearchPagesRequest) returns (SearchPagesResponse);
+}
+
+// ======================= resources =======================
+
+message Space {
+  string id = 1;
+  string key = 2; // e.g. "ENG"
+  string name = 3;
+  optional string description = 4;
+  google.protobuf.Timestamp create_time = 5;
+}
+
+message Page {
+  string id = 1;
+  string space_key = 2;
+  optional string parent_id = 3; // not set = top-level page (null)
+  string title = 4;
+  string content_md = 5; // Markdown; "TB-12" style keys are rendered as links by the FE
+  string author_id = 6;
+  google.protobuf.Timestamp create_time = 7;
+  google.protobuf.Timestamp update_time = 8;
+}
+
+// Small version of Page (no content) for lists, links and search.
+message PageSummary {
+  string id = 1;
+  string space_key = 2;
+  string title = 3;
+  google.protobuf.Timestamp update_time = 4;
+}
+
+// A node of the nested page tree (messages can contain themselves).
+message PageTreeNode {
+  string id = 1;
+  string title = 2;
+  repeated PageTreeNode children = 3;
+}
+
+// ======================= spaces =======================
+
+message ListSpacesRequest {}
+message ListSpacesResponse {
+  repeated Space spaces = 1;
+}
+
+message CreateSpaceRequest {
+  string key = 1; // ^[A-Z][A-Z0-9]{1,9}$
+  string name = 2;
+  optional string description = 3;
+}
+message CreateSpaceResponse {
+  Space space = 1;
+}
+
+message GetSpaceRequest {
+  string key = 1;
+}
+message GetSpaceResponse {
+  Space space = 1;
+}
+
+// ======================= pages =======================
+
+message GetPageTreeRequest {
+  string space_key = 1;
+}
+message GetPageTreeResponse {
+  repeated PageTreeNode roots = 1;
+}
+
+message CreatePageRequest {
+  string space_key = 1;
+  string title = 2;
+  optional string parent_id = 3; // must be a page in the same space
+  string content_md = 4;
+  string author_id = 5; // the gateway passes the current user id
+}
+message CreatePageResponse {
+  Page page = 1;
+}
+
+message GetPageRequest {
+  string id = 1;
+}
+message GetPageResponse {
+  Page page = 1;
+}
+
+// PATCH semantics via update_mask. Allowed paths: title, content_md, parent_id.
+// Mask "parent_id" with parent_id not set = move to top level.
+// Moving a page under itself or its own descendant → INVALID_ARGUMENT.
+message UpdatePageRequest {
+  string id = 1;
+  Page page = 2;
+  google.protobuf.FieldMask update_mask = 3;
+}
+message UpdatePageResponse {
+  Page page = 1;
+}
+
+message DeletePageRequest {
+  string id = 1; // deletes the whole subtree
+}
+message DeletePageResponse {
+  // Every page removed (the page + all descendants). The gateway passes these
+  // to tracker.v1.TrackerService/DeletePageLinks.
+  repeated string deleted_page_ids = 1;
+}
+
+message BatchGetPagesRequest {
+  repeated string ids = 1; // unknown ids are skipped
+}
+message BatchGetPagesResponse {
+  repeated PageSummary pages = 1;
+}
+
+message SearchPagesRequest {
+  string q = 1; // matches title and content_md
+  int32 limit = 2; // 0 = default (20)
+}
+message SearchPagesResponse {
+  repeated PageSummary pages = 1;
+}
