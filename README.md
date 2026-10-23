@@ -25,6 +25,11 @@ make down    # stop everything (the database is kept)
 `docker compose down && docker volume rm tracking_board_web_node_modules && make up`.
 The tests (`make test`, or `cd e2e && npm test`) run on the host against this stack.
 
+## Deploy
+
+Vercel (web) + Render (backend) + Supabase (Postgres, Google sign-in), all free tier.
+Step by step (in Thai): [`deploy/README.md`](deploy/README.md). CI and a daily encrypted DB backup run in GitHub Actions (`.github/workflows/`).
+
 ## Backend
 
 api-gateway (Go, :8080) → auth / tracker (Go) and docs (Python) over gRPC, with Postgres.

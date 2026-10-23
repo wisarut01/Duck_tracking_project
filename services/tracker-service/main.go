@@ -4,6 +4,7 @@
 // Env:
 //
 //	DATABASE_URL    postgres://tb:tb@localhost:5432/tracker_db?sslmode=disable
+//	DB_SCHEMA       "" = tables in the default schema; set = tables in that schema (Supabase)
 //	GRPC_ADDR       :50052
 //	SEED_DEMO_DATA  "true" = add the demo project TB when there are no projects
 package main
@@ -18,7 +19,7 @@ import (
 )
 
 func main() {
-	db, err := svc.OpenDB(svc.Env("DATABASE_URL", "postgres://tb:tb@localhost:5432/tracker_db?sslmode=disable"))
+	db, err := svc.OpenDB(svc.Env("DATABASE_URL", "postgres://tb:tb@localhost:5432/tracker_db?sslmode=disable"), svc.Env("DB_SCHEMA", ""))
 	if err != nil {
 		log.Fatal(err)
 	}

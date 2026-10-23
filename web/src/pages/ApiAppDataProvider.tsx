@@ -15,7 +15,7 @@ import {
   useUsers,
 } from '@/api/queries';
 import { useToast } from '@/components/ui/Toast';
-import { setToken } from '@/api/token';
+import { clearSession } from '@/api/token';
 
 /** หา issue ที่โหลดไว้แล้วใน cache (จาก GET /issues/{key} หรือรายการบน board) — ไม่ยิง API เพิ่ม */
 function findCachedIssue(queryClient: QueryClient, issueKey: string): IssueSummary | undefined {
@@ -71,7 +71,7 @@ export function ApiAppDataProvider({ children }: { children: ReactNode }) {
         navigate(`/spaces/${space.key}`);
       },
       onLogout: () => {
-        setToken(null); // RequireAuth เห็นว่าไม่มี token → พาไปหน้า login
+        clearSession(); // RequireAuth เห็นว่าไม่มี token → พาไปหน้า login
         queryClient.clear();
       },
     }),

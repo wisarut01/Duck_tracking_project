@@ -1,0 +1,40 @@
+# Every day: dump our three schemas from Supabase, encrypt the dump, keep it
+# as a workflow artifact for 30 days. Supabase's free plan has no backups.
+# Running every day also counts as database activity, so the free project
+# isn't paused for being idle a week.
+#
+# Repo secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL    the Session pooler connection string (same as DATABASE_URL on Render)
+#   BACKUP_PASSPHRASE  any long random text; you need it to restore (see deploy/README.md)
+name: Backup database
+
+on:
+  schedule:
+    - cron: "0 19 * * *" # 02:00 in Bangkok
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump tb_auth, tb_tracker, tb_docs
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          docker run --rm -e SUPABASE_DB_URL postgres:17-alpine \
+            sh -c 'pg_dump "$SUPABASE_DB_URL" --format=custom --no-owner --no-privileges \
+                   --schema=tb_auth --schema=tb_tracker --schema=tb_docs' > tb.dump
+          ls -l tb.dump
+          test -s tb.dump
+      - name: Encrypt
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          test -n "$BACKUP_PASSPHRASE"
+          gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase "$BACKUP_PASSPHRASE" -o tb.dump.gpg tb.dump
+          rm tb.dump
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tb-backup-${{ github.run_number }}
+          path: tb.dump.gpg
+          retention-days: 30

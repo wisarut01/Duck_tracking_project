@@ -14,7 +14,7 @@
 | Phase 2b — Service จริง: gateway (Go Fiber) + auth / tracker (Go) + docs (Python) + Postgres | ✅ เสร็จ (2026-10-23) |
 | Phase 2c — สลับเว็บและ test ไปใช้ gateway จริง (:8080), E2E ผ่าน → **MVP พร้อมใช้** | ✅ เสร็จ (2026-10-23) — **MVP พร้อมใช้** |
 | ส่วนที่ 2 — บทเรียน FE / BE (สอนจากโค้ด MVP ที่เสร็จแล้ว) | ⬜ หลัง MVP |
-| Phase 3 (เสนอ ยังไม่ได้ตกลง) — พร้อมใช้จริงบน server: CI, deploy, HTTPS, backup, monitoring | ⬜ ยังไม่ได้วางแผน |
+| Phase 3 — deploy ใช้เองจากที่ไหนก็ได้: Vercel + Render + Supabase, login ด้วย Gmail (แผนด้านล่าง) | 🟡 กำลังทำ (เริ่ม 2026-10-23) |
 
 ## Phase 0 — Contract
 
@@ -163,4 +163,54 @@ Login ทดสอบ: `duck@example.com` / `password123`
 1. **ส่วนที่ 2 — บทเรียน** (MVP เสร็จแล้ว เริ่มได้เลย)
    - **FE:** React + TS + Tailwind + react-query อิงจากโค้ดใน `web/`
    - **BE:** Go Fiber gateway, gRPC microservice (Go + GORM) และ Python docs-service อิงจากโค้ด Phase 2b
-2. **Phase 3** (ถ้าจะเปิดให้คนอื่นใช้จริง) — ตกลง scope กันก่อน: CI (GitHub Actions), deploy, HTTPS, เก็บ secret, backup DB, log/monitoring
+2. **Phase 3** — deploy (แผนด้านล่าง)
+
+## แผน Phase 3 — deploy (ตกลง 2026-10-23)
+
+**เป้าหมาย:** ใช้เองคนเดียว เปิดได้จากทุกที่ผ่าน HTTPS สาธารณะ, login ด้วย Gmail, ใช้ free tier ทั้งหมด
+
+| ส่วน | ไปอยู่ที่ | หมายเหตุ |
+|---|---|---|
+| เว็บ | Vercel (Hobby) | `vercel.json` ส่ง `/api/*` ต่อไปที่ Render → domain เดียวกัน ไม่ต้องใช้ CORS |
+| gateway + auth / tracker / docs | Render (free web service) | รวม 4 process ไว้ใน container เดียว คุยกันทาง localhost; ว่าง 15 นาทีจะหลับ, ปลุกครั้งแรกรอ ~1 นาที (ตกลงว่ารับได้) |
+| Postgres | Supabase (free, project ใหม่ = ตัวที่ 2) | 1 schema ต่อ service (`tb_auth`, `tb_tracker`, `tb_docs`) แทน 1 database ต่อ service |
+| Login | Supabase Auth → Google | ผ่านเฉพาะอีเมลใน allowlist; ปิด register / login ด้วยรหัสผ่านบน production (บนเครื่องยังใช้ได้ เพื่อให้เทสต์รันได้) |
+
+**งานฝั่งโค้ด (ไม่ต้องใช้บัญชี):**
+1. auth-service: `AUTH_MODE=supabase` → `ValidateToken` ตรวจ JWT ของ Supabase (JWKS), เช็ก allowlist (`ALLOWED_EMAILS`), สร้าง user ในตารางของเราเองตอน login ครั้งแรก; `Register` / `Login` → 403
+2. ทุก service: `DB_SCHEMA` (ตารางอยู่ใน schema ของตัวเอง, สร้าง schema ให้ถ้ายังไม่มี)
+3. Image เดียวสำหรับ Render (`deploy/render/`)
+4. เว็บ: ปุ่ม "Sign in with Google" เมื่อตั้ง `VITE_SUPABASE_URL`; `vercel.json`
+5. GitHub Actions: CI (เทสต์ทุก push), ทุกวัน: ปลุก Supabase กันโดน pause + `pg_dump` เก็บเป็น backup
+6. แก้ `api/openapi.yaml` (register/login ตอบ 403 ได้) และ `docs/AGREEMENTS.md` (schema ต่อ service, Google login)
+
+**งานที่คุณต้องทำใน dashboard (มีขั้นตอนให้ทีละข้อ):** สร้าง GitHub repo, Supabase project + เปิด Google provider (ต้องสร้าง OAuth client ใน Google Cloud Console), Render service, Vercel project, ใส่ env / secret
+
+**ตรวจรับ:** login ด้วย Gmail ของตัวเองจากมือถือได้; Gmail อื่นโดนปฏิเสธ; `make test` บนเครื่องยังผ่าน; ลองกู้ backup ได้จริงหนึ่งครั้ง
+
+**ไม่อยู่ในรอบนี้:** migration แบบมีเวอร์ชัน (ยังใช้ AutoMigrate / `create_all`), monitoring / alert
+
+**เปลี่ยน (2026-10-24):**
+- ให้ทุกบัญชี Google sign in ได้ ไม่ต้องคอยเพิ่มรายชื่อ → `ALLOWED_EMAILS=*` (ค่าเริ่มต้นใน `render.yaml`)
+- **ข้อควรรู้:** ใครเจอ URL ก็เห็น แก้ และลบข้อมูลได้ทั้งหมด เพราะยังไม่มีสิทธิ์ราย project
+- ถ้าจะจำกัดทีหลัง ใส่รายชื่ออีเมล หรือ `@domain` ใน Render ได้เลย ไม่ต้องแก้โค้ด
+
+### ความคืบหน้า Phase 3
+
+- **โค้ดเสร็จแล้ว (2026-10-24):**
+  - auth-service `AUTH_MODE=supabase`: ตรวจ token ด้วย JWKS ของ Supabase (ES256 / RS256), เช็ก issuer, audience และวันหมดอายุ
+    - allowlist ไม่สนตัวพิมพ์ และ `@domain` ต้องตรงทั้ง domain
+    - สร้าง user ตอน login ครั้งแรก (ชื่อ / รูปจาก Google)
+  - `DB_SCHEMA` ทั้ง 3 service; docs-service รับ URL แบบ `postgresql://` ของ Supabase ได้ตรงๆ
+  - `deploy/render/` (image เดียว, 4 process) + `render.yaml` (Blueprint)
+  - เว็บ: ปุ่ม "เข้าสู่ระบบด้วย Google" เมื่อตั้ง `VITE_SUPABASE_*`, อีเมลไม่ได้รับอนุญาต → กลับหน้า login พร้อมข้อความ; `web/vercel.json`
+  - `.github/workflows/ci.yml` (Go + Postgres, docs-service, web build, Playwright API + E2E กับ docker compose) และ `backup.yml` (pg_dump → เข้ารหัส → artifact 30 วัน ทุกวัน)
+  - spec: register / login / me ตอบ 403 ได้; AGREEMENTS อัปเดตแล้ว; คู่มือ `deploy/README.md`
+- **ผลทดสอบ:**
+  - Go: ทุก package ผ่าน (รวมเทสต์ login ผ่าน Supabase 3 ชุด ที่ใช้ key ปลอมเซ็น token เหมือน Supabase)
+  - docs-service 11/11 (รวมเทสต์ schema กับ Postgres จริง)
+  - image ของ Render รันกับ Postgres ทดสอบ (database เดียว, 3 schema): API **105/105**, ใช้ RAM ~77 MB (free ให้ 512 MB)
+  - เว็บ build แบบ production + `/api` ผ่าน proxy แบบเดียวกับ Vercel: E2E **11/11**
+  - backup → เข้ารหัส → ถอดรหัส → `pg_restore` ลง database ใหม่: จำนวนแถวตรงกันทุกตาราง
+- **ยังไม่ได้ทดสอบ:** login ผ่าน Supabase / Google ของจริง (ต้องมี project จริงก่อน) และ GitHub Actions บน GitHub จริง
+- **รอ:** ตั้งค่า dashboard ตาม `deploy/README.md` (Supabase → Google → Render → Vercel → GitHub secrets) แล้วตรวจรับตามข้อด้านบน

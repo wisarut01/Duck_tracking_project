@@ -66,11 +66,20 @@ The Go code is one module at the repo root (`go.mod`). The gRPC code is generate
 | all services | `DATABASE_URL` | `postgres://tb:tb@localhost:5432/<service>_db?sslmode=disable` (docs-service: `postgresql+psycopg://…/docs_db`) |
 | | `GRPC_ADDR` | `:50051` / `:50052` / `[::]:50053` |
 | | `SEED_DEMO_DATA` | `false` |
-| auth-service | `JWT_SECRET` | a dev secret (logs a warning). **Set your own outside dev.** |
+| all services | `DB_SCHEMA` | `""` = tables in the default schema. Set (`tb_auth`, …) = tables in that schema, created if needed (Supabase: one database, one schema per service) |
+| auth-service | `AUTH_MODE` | `password` (register/login, our own JWT). `supabase` = Google sign-in through Supabase Auth, register/login → 403 |
+| | `JWT_SECRET` | password mode: a dev secret (logs a warning). **Set your own outside dev.** |
+| | `SUPABASE_URL` | supabase mode: `https://<ref>.supabase.co` (tokens are checked with its public keys, JWKS) |
+| | `ALLOWED_EMAILS` | supabase mode: `*` = every Google account (what production uses), or `me@gmail.com,friend@gmail.com,@team.com` (others get 403) |
 | api-gateway | `HTTP_ADDR` | `:8080` |
 | | `OPENAPI_PATH` | `api/openapi.yaml` (`/app/openapi.yaml` in Docker) |
 | | `AUTH_ADDR`, `TRACKER_ADDR`, `DOCS_ADDR` | `localhost:50051` / `:50052` / `:50053` |
 | | `CORS_ORIGINS` | `http://localhost:5173,http://localhost:6006,http://localhost:8081` |
+
+## Production
+
+[`deploy/README.md`](../deploy/README.md): Vercel (web) + Render (`deploy/render/`: the gateway and the 3
+services in one container, gRPC over localhost) + Supabase (Postgres + Google sign-in).
 
 ## Tests
 

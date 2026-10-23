@@ -1,0 +1,94 @@
+# Tests on every push and pull request. Render and Vercel deploy `main` on their own;
+# a red run here means "don't trust what just went out".
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  go:
+    name: Go services (vet + tests with Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env: { POSTGRES_USER: tb, POSTGRES_PASSWORD: tb, POSTGRES_DB: tb }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U tb" --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with: { go-version: "1.27" }
+      - run: make gen
+      - run: go vet ./services/...
+      - run: go test ./services/...
+        env:
+          TEST_DATABASE_URL: postgres://tb:tb@localhost:5432/tb?sslmode=disable
+
+  docs-service:
+    name: docs-service (ruff + pytest)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env: { POSTGRES_USER: tb, POSTGRES_PASSWORD: tb, POSTGRES_DB: tb }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U tb" --health-interval 5s --health-retries 10
+    defaults:
+      run: { working-directory: services/docs-service }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.13" }
+      - run: make -C ../.. gen
+      - run: pip install -r requirements-dev.txt ruff
+      - run: ruff check . && ruff format --check .
+      - run: python -m pytest -q
+        env:
+          TEST_DATABASE_URL: postgresql://tb:tb@localhost:5432/tb
+
+  web:
+    name: web (types + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: web }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: "24", cache: npm, cache-dependency-path: web/package-lock.json }
+      - run: npm ci
+      - run: npm run check:api
+      - run: npm run build
+
+  e2e:
+    name: Playwright (API + web E2E against docker compose)
+    needs: [go, docs-service, web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: "24", cache: npm, cache-dependency-path: e2e/package-lock.json }
+      - name: Start the stack
+        run: |
+          docker compose up -d --build postgres auth-service tracker-service docs-service api-gateway web
+          for i in $(seq 1 90); do
+            curl -sf http://localhost:8080/health >/dev/null && curl -sf http://localhost:5173 >/dev/null && exit 0
+            sleep 2
+          done
+          docker compose logs; exit 1
+      - run: npm ci
+        working-directory: e2e
+      - run: npx playwright install --with-deps chromium
+        working-directory: e2e
+      - run: npx playwright test --project=api --project=app
+        working-directory: e2e
+        env: { CI: "true" }
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 7
+      - if: failure()
+        run: docker compose logs --tail 200

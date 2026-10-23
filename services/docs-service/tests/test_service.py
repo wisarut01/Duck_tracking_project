@@ -155,3 +155,11 @@ def test_seed(stub, session_factory):
     assert tree(stub)[0][0] == "Engineering Home"
     board_spec = stub.GetPage(pb.GetPageRequest(id=str(P["board_spec"]))).page
     assert board_spec.parent_id == str(P["frontend"])
+
+
+def test_sqlalchemy_url():
+    from docs_service.server import sqlalchemy_url
+
+    assert sqlalchemy_url("postgresql://u:p@h:5432/postgres") == "postgresql+psycopg://u:p@h:5432/postgres"
+    assert sqlalchemy_url("postgres://u:p@h/db") == "postgresql+psycopg://u:p@h/db"
+    assert sqlalchemy_url("postgresql+psycopg://u:p@h/db") == "postgresql+psycopg://u:p@h/db"

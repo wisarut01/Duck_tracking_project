@@ -7,7 +7,6 @@ package svctest
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 	"testing"
 
@@ -15,10 +14,12 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/duck/tracking_board/services/internal/svc"
 )
 
-// DB returns a connection whose search_path is a brand-new schema with the
-// given models migrated. The schema is dropped when the test ends.
+// DB returns a connection to a brand-new schema with the given models migrated.
+// The schema is dropped when the test ends.
 func DB(t *testing.T, models ...any) *gorm.DB {
 	t.Helper()
 	dsn := os.Getenv("TEST_DATABASE_URL")
@@ -31,25 +32,15 @@ func DB(t *testing.T, models ...any) *gorm.DB {
 		t.Fatalf("connect: %v", err)
 	}
 	schema := "test_" + uuid.NewString()[:8]
-	if err := admin.Exec(fmt.Sprintf("CREATE SCHEMA %q", schema)).Error; err != nil {
-		t.Fatalf("create schema: %v", err)
-	}
 	t.Cleanup(func() {
-		admin.Exec(fmt.Sprintf("DROP SCHEMA %q CASCADE", schema))
+		admin.Exec(fmt.Sprintf("DROP SCHEMA IF EXISTS %q CASCADE", schema))
 		if sqlDB, err := admin.DB(); err == nil {
 			sqlDB.Close()
 		}
 	})
 
-	u, err := url.Parse(dsn)
-	if err != nil {
-		t.Fatalf("parse TEST_DATABASE_URL: %v", err)
-	}
-	q := u.Query()
-	q.Set("search_path", schema)
-	u.RawQuery = q.Encode()
-
-	db, err := gorm.Open(postgres.Open(u.String()), &gorm.Config{Logger: logger.Discard})
+	// The same path the services use with DB_SCHEMA: the schema is created on connect.
+	db, err := svc.OpenDB(dsn, schema)
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}

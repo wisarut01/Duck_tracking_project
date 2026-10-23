@@ -13,7 +13,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/stdlib"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -32,26 +34,52 @@ func Env(key, def string) string {
 
 // OpenDB connects to Postgres. It retries for a while because in Docker the
 // service often starts before Postgres is ready.
-func OpenDB(dsn string) (*gorm.DB, error) {
+//
+// schema "" = use the database as is (one database per service, docker compose).
+// Otherwise the service's tables live in that schema, which is created if
+// needed — that is how the services share one Supabase database without
+// sharing tables (and stay out of "public", which Supabase exposes over HTTP).
+func OpenDB(dsn, schema string) (*gorm.DB, error) {
+	config, err := pgx.ParseConfig(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("parse DATABASE_URL: %w", err)
+	}
 	var lastErr error
 	for attempt := 0; attempt < 30; attempt++ {
-		db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		sqlDB := stdlib.OpenDB(*config, stdlib.OptionAfterConnect(func(ctx context.Context, conn *pgx.Conn) error {
+			return useSchema(ctx, conn, schema)
+		}))
+		db, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{
 			// Silent: expected errors (duplicate key → AlreadyExists) aren't worth a
 			// log line, and unexpected ones are logged by logUnary below.
 			Logger:  logger.Default.LogMode(logger.Silent),
 			NowFunc: func() time.Time { return time.Now().UTC() },
 		})
 		if err == nil {
-			sqlDB, _ := db.DB()
 			if err = sqlDB.Ping(); err == nil {
 				return db, nil
 			}
 		}
+		sqlDB.Close()
 		lastErr = err
 		log.Printf("database not ready (%v), retrying…", err)
 		time.Sleep(time.Second)
 	}
 	return nil, fmt.Errorf("connect to database: %w", lastErr)
+}
+
+// useSchema runs on every new connection: create the schema and make it the
+// only one unqualified table names resolve to.
+func useSchema(ctx context.Context, conn *pgx.Conn, schema string) error {
+	if schema == "" {
+		return nil
+	}
+	name := pgx.Identifier{schema}.Sanitize()
+	if _, err := conn.Exec(ctx, "CREATE SCHEMA IF NOT EXISTS "+name); err != nil {
+		return fmt.Errorf("create schema %s: %w", schema, err)
+	}
+	_, err := conn.Exec(ctx, "SET search_path TO "+name)
+	return err
 }
 
 // IsUniqueViolation reports whether err is Postgres "duplicate key" (23505).

@@ -3,6 +3,7 @@ module github.com/duck/tracking_board
 go 1.26.0
 
 require (
+	github.com/MicahParks/keyfunc/v3 v3.8.2
 	github.com/getkin/kin-openapi v0.152.0
 	github.com/gofiber/fiber/v3 v3.6.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -18,6 +19,7 @@ require (
 )
 
 require (
+	github.com/MicahParks/jwkset v0.11.3 // indirect
 	github.com/go-openapi/jsonpointer v0.22.5 // indirect
 	github.com/go-openapi/swag/jsonname v0.25.5 // indirect
 	github.com/gofiber/schema v1.8.8 // indirect
@@ -43,5 +45,6 @@ require (
 	golang.org/x/net v0.61.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
 )

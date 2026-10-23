@@ -2,6 +2,8 @@
 
 Env:
     DATABASE_URL    postgresql+psycopg://tb:tb@localhost:5432/docs_db
+                    (a plain postgresql:// URL, as Supabase shows it, works too)
+    DB_SCHEMA       "" = tables in the default schema; set = tables in that schema (Supabase)
     GRPC_ADDR       [::]:50053
     SEED_DEMO_DATA  "true" = add the demo spaces ENG/PM when there are no spaces
 """
@@ -15,7 +17,7 @@ from concurrent import futures
 
 import grpc
 from docs.v1 import docs_pb2_grpc
-from sqlalchemy import Engine, create_engine, text
+from sqlalchemy import Engine, create_engine, event, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 
@@ -56,9 +58,30 @@ class LogInterceptor(grpc.ServerInterceptor):
         )
 
 
-def connect(url: str) -> Engine:
-    """Create the engine, waiting for Postgres (in Docker it may start after us)."""
-    engine = create_engine(url, pool_pre_ping=True)
+def sqlalchemy_url(url: str) -> str:
+    """postgres:// and postgresql:// (what Supabase shows) → the psycopg 3 driver."""
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix) :]
+    return url
+
+
+def connect(url: str, schema: str = "") -> Engine:
+    """Create the engine, waiting for Postgres (in Docker it may start after us).
+
+    With a schema, every new connection creates it if needed and uses it as its
+    search_path — the services share one Supabase database but not tables."""
+    engine = create_engine(sqlalchemy_url(url), pool_pre_ping=True)
+    if schema:
+
+        @event.listens_for(engine, "connect")
+        def use_schema(dbapi_connection, _record):
+            name = '"' + schema.replace('"', '""') + '"'
+            with dbapi_connection.cursor() as cur:
+                cur.execute(f"CREATE SCHEMA IF NOT EXISTS {name}")
+                cur.execute(f"SET search_path TO {name}")
+            dbapi_connection.commit()
+
     for _ in range(30):
         try:
             with engine.connect() as conn:
@@ -79,7 +102,10 @@ def build_server(session_factory: sessionmaker, addr: str) -> tuple[grpc.Server,
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
-    engine = connect(os.environ.get("DATABASE_URL", "postgresql+psycopg://tb:tb@localhost:5432/docs_db"))
+    engine = connect(
+        os.environ.get("DATABASE_URL", "postgresql+psycopg://tb:tb@localhost:5432/docs_db"),
+        os.environ.get("DB_SCHEMA", ""),
+    )
     Base.metadata.create_all(engine)
     session_factory = sessionmaker(engine, expire_on_commit=False)
     if os.environ.get("SEED_DEMO_DATA") == "true":

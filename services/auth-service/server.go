@@ -37,6 +37,7 @@ type server struct {
 	db        *gorm.DB
 	jwtSecret []byte
 	now       func() time.Time
+	supabase  *supabaseAuth // set = AUTH_MODE=supabase (Google sign-in), see supabase.go
 }
 
 func newServer(db *gorm.DB, jwtSecret string) *server {
@@ -44,6 +45,9 @@ func newServer(db *gorm.DB, jwtSecret string) *server {
 }
 
 func (s *server) Register(ctx context.Context, req *authv1.RegisterRequest) (*authv1.RegisterResponse, error) {
+	if s.supabase != nil {
+		return nil, errPasswordLoginDisabled
+	}
 	email := strings.TrimSpace(req.GetEmail())
 	displayName := strings.TrimSpace(req.GetDisplayName())
 	if _, err := mail.ParseAddress(email); err != nil {
@@ -76,6 +80,9 @@ func (s *server) Register(ctx context.Context, req *authv1.RegisterRequest) (*au
 }
 
 func (s *server) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.LoginResponse, error) {
+	if s.supabase != nil {
+		return nil, errPasswordLoginDisabled
+	}
 	// Same message for "no such user" and "wrong password" — don't leak which one.
 	invalid := status.Error(codes.Unauthenticated, "invalid email or password")
 
@@ -99,6 +106,14 @@ func (s *server) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.L
 }
 
 func (s *server) ValidateToken(ctx context.Context, req *authv1.ValidateTokenRequest) (*authv1.ValidateTokenResponse, error) {
+	if s.supabase != nil {
+		user, err := s.validateSupabase(ctx, req.GetAccessToken())
+		if err != nil {
+			return nil, err
+		}
+		return &authv1.ValidateTokenResponse{User: user}, nil
+	}
+
 	claims := jwt.RegisteredClaims{}
 	_, err := jwt.ParseWithClaims(req.GetAccessToken(), &claims,
 		func(*jwt.Token) (any, error) { return s.jwtSecret, nil },

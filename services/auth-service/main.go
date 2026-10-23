@@ -3,13 +3,20 @@
 // Env:
 //
 //	DATABASE_URL    postgres://tb:tb@localhost:5432/auth_db?sslmode=disable
-//	JWT_SECRET      HS256 secret for access tokens (set your own outside dev!)
+//	DB_SCHEMA       "" = tables in the default schema; set = tables in that schema (Supabase)
+//	AUTH_MODE       "password" (default: register/login with our own JWT) or
+//	                "supabase" (Google sign-in through Supabase Auth; register/login are off)
+//	JWT_SECRET      password mode: HS256 secret for access tokens (set your own outside dev!)
+//	SUPABASE_URL    supabase mode: https://<ref>.supabase.co (tokens are checked with its public keys)
+//	ALLOWED_EMAILS  supabase mode: who may use the app, e.g. "me@gmail.com,friend@gmail.com,@team.com",
+//	                or "*" for every Google account
 //	GRPC_ADDR       :50051
 //	SEED_DEMO_DATA  "true" = add the demo users (duck/mint/ploy) when the table is empty
 package main
 
 import (
 	"log"
+	"os"
 
 	"google.golang.org/grpc"
 
@@ -20,7 +27,7 @@ import (
 const devJWTSecret = "dev-secret-do-not-use-in-prod"
 
 func main() {
-	db, err := svc.OpenDB(svc.Env("DATABASE_URL", "postgres://tb:tb@localhost:5432/auth_db?sslmode=disable"))
+	db, err := svc.OpenDB(svc.Env("DATABASE_URL", "postgres://tb:tb@localhost:5432/auth_db?sslmode=disable"), svc.Env("DB_SCHEMA", ""))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -33,12 +40,22 @@ func main() {
 		}
 	}
 
-	secret := svc.Env("JWT_SECRET", devJWTSecret)
-	if secret == devJWTSecret {
-		log.Print("WARNING: JWT_SECRET is not set, using the dev secret")
+	srv := newServer(db, svc.Env("JWT_SECRET", devJWTSecret))
+	switch mode := svc.Env("AUTH_MODE", "password"); mode {
+	case "password":
+		if string(srv.jwtSecret) == devJWTSecret {
+			log.Print("WARNING: JWT_SECRET is not set, using the dev secret")
+		}
+	case "supabase":
+		if srv.supabase, err = newSupabaseAuth(os.Getenv("SUPABASE_URL"), os.Getenv("ALLOWED_EMAILS")); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("auth: Google sign-in via %s, %d allowed email(s)/domain(s)", srv.supabase.issuer, len(srv.supabase.allowed))
+	default:
+		log.Fatalf("AUTH_MODE must be password or supabase, not %q", mode)
 	}
 
 	svc.Serve("auth-service", svc.Env("GRPC_ADDR", ":50051"), func(s *grpc.Server) {
-		authv1.RegisterAuthServiceServer(s, newServer(db, secret))
+		authv1.RegisterAuthServiceServer(s, srv)
 	})
 }

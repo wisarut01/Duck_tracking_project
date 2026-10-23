@@ -700,6 +700,23 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description login แล้วแต่ไม่มีสิทธิ์ (อีเมลไม่อยู่ใน allowlist) หรือปิด login ด้วยรหัสผ่านไว้ */
+        Forbidden: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": {
+                 *         "code": "PERMISSION_DENIED",
+                 *         "message": "stranger@gmail.com is not allowed to use this app — ask the owner to add it"
+                 *       }
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description ไม่พบข้อมูล */
         NotFound: {
             headers: {
@@ -772,6 +789,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
         };
     };
@@ -799,6 +817,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getMe: {
@@ -820,6 +839,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listUsers: {

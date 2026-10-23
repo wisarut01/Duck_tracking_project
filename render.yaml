@@ -1,0 +1,23 @@
+# Render Blueprint (Render → New → Blueprint → pick this repo).
+# Values marked `sync: false` are asked for when you create it, and are never stored in git.
+services:
+  - type: web
+    name: duck-tracking-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./deploy/render/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: AUTH_MODE
+        value: supabase
+      - key: DATABASE_URL       # Supabase → Connect → Session pooler (postgresql://postgres.<ref>:<password>@…:5432/postgres)
+        sync: false
+      - key: SUPABASE_URL       # https://<ref>.supabase.co
+        sync: false
+      - key: ALLOWED_EMAILS     # "*" = every Google account. To limit it later: me@gmail.com,friend@gmail.com or @domain.com
+        value: "*"
+      - key: CORS_ORIGINS       # the web is on Vercel and calls /api through it (same origin), so this is only a fallback
+        value: https://duck-tracking.vercel.app
