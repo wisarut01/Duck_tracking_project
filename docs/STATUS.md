@@ -1,6 +1,6 @@
 # Project Status — Tracking Board
 
-> อัปเดตล่าสุด: 2026-10-23 · ยังไม่ได้ commit
+> อัปเดตล่าสุด: 2026-10-23
 
 ## ภาพรวม
 
@@ -8,6 +8,7 @@
 |---|---|
 | Phase 0 — ข้อตกลง + Contract | ✅ เสร็จ |
 | Phase 1 — FE / BE / QA (ทำพร้อมกัน, ใช้ mock) | ✅ เสร็จ |
+| รันทั้งระบบด้วย `make up` (docker compose) | ✅ เสร็จ (2026-10-23) |
 | ตัดสินใจเรื่อง spec 6 ข้อ (ดูหัวข้อ "ข้อที่ตัดสินใจแล้ว") | ✅ เสร็จ (2026-10-23) |
 | Phase 2 — Service จริง (Go/Python + gRPC) + FE ต่อ API | ⬜ ยังไม่เริ่ม |
 | ส่วนที่ 2 — บทเรียน FE / BE | ⬜ ยังไม่เริ่ม |
@@ -61,6 +62,15 @@
 
 ## วิธีรัน
 
+รันทุกอย่างพร้อมกันด้วย Docker:
+
+```bash
+make up      # Mock API :4010, Swagger UI :8081, Web :5173, Storybook :6006
+make down    # หยุดทั้งหมด
+```
+
+หรือรันทีละตัวบนเครื่อง:
+
 ```bash
 make mock                      # Mock API   → http://localhost:4010/api/v1
 make swagger                   # Swagger UI → http://localhost:8081
@@ -97,8 +107,7 @@ Login ทดสอบ: `duck@example.com` / `password123`
 
 ## ขั้นต่อไป
 
-1. Commit แรกเป็นจุดตั้งต้น (ตอนนี้ยังไม่มี commit เลย)
-2. ส่วนที่ 2: ออกแบบบทเรียน
+1. ส่วนที่ 2: ออกแบบบทเรียน
    - **FE:** React + TS + Tailwind อิงจาก component ที่ทำไว้แล้ว
    - **BE:** Go Fiber gateway, gRPC microservice (Go + GORM) และ Python docs-service อิงจาก proto ที่ทำไว้แล้ว
-3. Phase 2: ทำ service จริงตาม proto แล้วสลับ FE และ QA จาก mock (`:4010`) ไปใช้ gateway จริง (`:8080`)
+2. Phase 2: ทำ service จริงตาม proto แล้วสลับ FE และ QA จาก mock (`:4010`) ไปใช้ gateway จริง (`:8080`)

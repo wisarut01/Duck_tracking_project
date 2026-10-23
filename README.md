@@ -3,20 +3,41 @@
 Jira-like issue tracker + Confluence-like docs, linked together.
 Read [`docs/AGREEMENTS.md`](docs/AGREEMENTS.md) first. The REST contract is [`api/openapi.yaml`](api/openapi.yaml).
 
+## Run everything (Docker)
+
+```bash
+make up      # build + start all 4 services in the background
+make ps      # what's running
+make logs    # follow the logs
+make down    # stop everything
+```
+
+| What | URL |
+|---|---|
+| Mock API | http://localhost:4010/api/v1 |
+| Swagger UI | http://localhost:8081 |
+| Web app | http://localhost:5173 |
+| Storybook | http://localhost:6006 (first start takes ~30s) |
+
+`web` and `storybook` mount `./web`, so edits hot-reload. Their `node_modules` live in the
+`web_node_modules` volume. After `web/package.json` changes, rebuild with
+`docker compose down && docker volume rm tracking_board_web_node_modules && make up`.
+The tests (`make smoke`, `cd e2e && npm test`) run on the host against this stack.
+
 ## Backend (mock)
 
 Phase 1 runs a demo backend: a stateful mock API and Swagger UI. The real Go/Python services come in Phase 2.
 
 | What | URL | Start with |
 |---|---|---|
-| Mock API | http://localhost:4010/api/v1 | `make mock` (Node) or `make up` (Docker) |
-| Swagger UI | http://localhost:8081 | `make swagger` (Docker) or `make up` |
+| Mock API | http://localhost:4010/api/v1 | `make mock` (Node) or `make up-api` (Docker) |
+| Swagger UI | http://localhost:8081 | `make swagger` (Docker) or `make up-api` |
 
 ```bash
 make mock      # mock API on :4010 (needs Node 20+)
 make smoke     # 2nd terminal: run the demo flow against it
 make swagger   # Swagger UI on :8081 → "Authorize" with a token from /auth/login, then "Try it out"
-make up        # or run both in Docker;  make down to stop
+make up-api    # or run both in Docker;  make down to stop
 make lint      # lint api/openapi.yaml
 ```
 

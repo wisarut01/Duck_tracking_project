@@ -1,0 +1,10 @@
+# Dev image for the web app and Storybook (docker-compose services `web` and `storybook`).
+# Only the dependencies are baked in. docker-compose mounts ./web over /app so edits
+# hot-reload, and keeps the image's node_modules in a volume.
+FROM node:24-alpine
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+ENV STORYBOOK_DISABLE_TELEMETRY=1
+EXPOSE 5173 6006
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
