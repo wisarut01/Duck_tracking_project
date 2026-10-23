@@ -5,3 +5,6 @@ storybook-static/
 .env
 e2e/test-results/
 e2e/playwright-report/
+__pycache__/
+.pytest_cache/
+.ruff_cache/

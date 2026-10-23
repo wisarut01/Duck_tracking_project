@@ -6,7 +6,7 @@ Read [`docs/AGREEMENTS.md`](docs/AGREEMENTS.md) first. The REST contract is [`ap
 ## Run everything (Docker)
 
 ```bash
-make up      # build + start all 4 services in the background
+make up      # build + start mock API, Swagger UI, web, Storybook in the background
 make ps      # what's running
 make logs    # follow the logs
 make down    # stop everything
@@ -24,9 +24,20 @@ make down    # stop everything
 `docker compose down && docker volume rm tracking_board_web_node_modules && make up`.
 The tests (`make smoke`, `cd e2e && npm test`) run on the host against this stack.
 
+## Backend (real)
+
+The real backend runs in Docker: api-gateway (Go, :8080) → auth / tracker (Go) and docs (Python) over gRPC, with Postgres.
+See [`services/README.md`](services/README.md).
+
+```bash
+make up-real     # postgres + 3 services + gateway on http://localhost:8080/api/v1 (same demo data as the mock)
+make test-real   # Playwright API suite against it
+make test-go     # Go tests;  make test-docs → docs-service tests
+```
+
 ## Backend (mock)
 
-Phase 1 runs a demo backend: a stateful mock API and Swagger UI. The real Go/Python services come in Phase 2.
+A stateful mock API and Swagger UI. The web app and the tests still use it by default.
 
 | What | URL | Start with |
 |---|---|---|

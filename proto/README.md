@@ -17,7 +17,7 @@ cd proto
 npx @bufbuild/buf lint       # style rules (STANDARD), passes today
 npx @bufbuild/buf generate   # → ../gen/go and ../gen/python (see buf.gen.yaml)
 ```
-You don't need to install `buf`; `npx` downloads it. `buf generate` uses buf's remote
+You don't need to install `buf`; `npx` downloads it (or run `make gen` from the repo root, which uses Docker). `buf generate` uses buf's remote
 plugins, so you also don't need `protoc`. Generated code goes in `/gen` and isn't committed.
 
 ## Conventions

@@ -1,10 +1,9 @@
-# Local dev stack (Phase 1 = mock backend + frontend).
-#   make up    → mock-api :4010, Swagger UI :8081, web :5173, Storybook :6006
-#   make down  → stop everything
-#
-# Later (Phase 2) the real gateway + services + postgres will be added here.
-# postgres is already sketched below behind a profile, so it does NOT start by default:
-#   docker compose --profile db up -d postgres
+# Local dev stack.
+#   make up       → mock-api :4010, Swagger UI :8081, web :5173, Storybook :6006
+#   make up-real  → the real backend: postgres :5432, auth/tracker/docs services (gRPC
+#                   :50051-50053) and api-gateway :8080. It is behind the "real" profile,
+#                   so a plain `docker compose up` doesn't start it.
+#   make down     → stop everything
 
 services:
   mock-api:
@@ -60,9 +59,9 @@ services:
       - web_node_modules:/app/node_modules
     command: ["npx", "storybook", "dev", "-p", "6006", "--host", "0.0.0.0", "--ci"]
 
-  # --- Phase 2: one Postgres instance, one database per service ---
+  # --- real backend (Phase 2b): one Postgres instance, one database per service ---
   postgres:
-    profiles: ["db"]
+    profiles: ["real"]
     image: postgres:17-alpine
     ports:
       - "5432:5432"
@@ -70,9 +69,68 @@ services:
       POSTGRES_USER: tb
       POSTGRES_PASSWORD: tb
       POSTGRES_DB: tb
-      # TODO(phase 2): init script creating auth_db / tracker_db / docs_db
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./deploy/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro  # auth_db, tracker_db, docs_db
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "tb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  auth-service:
+    profiles: ["real"]
+    build: { context: ., dockerfile: services/go.Dockerfile, args: { SERVICE: auth-service } }
+    ports:
+      - "50051:50051"
+    environment:
+      DATABASE_URL: postgres://tb:tb@postgres:5432/auth_db?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-do-not-use-in-prod}
+      SEED_DEMO_DATA: "true"   # duck / mint / ploy, password123
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  tracker-service:
+    profiles: ["real"]
+    build: { context: ., dockerfile: services/go.Dockerfile, args: { SERVICE: tracker-service } }
+    ports:
+      - "50052:50052"
+    environment:
+      DATABASE_URL: postgres://tb:tb@postgres:5432/tracker_db?sslmode=disable
+      SEED_DEMO_DATA: "true"   # project TB with TB-1..TB-12
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  docs-service:
+    profiles: ["real"]
+    build: { context: ., dockerfile: services/docs-service/Dockerfile }
+    ports:
+      - "50053:50053"
+    environment:
+      DATABASE_URL: postgresql+psycopg://tb:tb@postgres:5432/docs_db
+      SEED_DEMO_DATA: "true"   # spaces ENG and PM with their pages
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api-gateway:
+    profiles: ["real"]
+    build: { context: ., dockerfile: services/go.Dockerfile, args: { SERVICE: api-gateway } }
+    ports:
+      - "8080:8080"
+    environment:
+      AUTH_ADDR: auth-service:50051
+      TRACKER_ADDR: tracker-service:50052
+      DOCS_ADDR: docs-service:50053
+      CORS_ORIGINS: http://localhost:5173,http://localhost:6006,http://localhost:8081
+    depends_on:
+      - auth-service
+      - tracker-service
+      - docs-service
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]  # not localhost: that is ::1 in alpine
+      interval: 10s
+      timeout: 3s
+      retries: 3
 
 volumes:
   pgdata:

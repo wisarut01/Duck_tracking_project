@@ -1,0 +1,10 @@
+# Build context for the Go services and docs-service is the repo root
+# (they need proto/ and go.mod). Keep it small.
+**/node_modules
+.git
+web
+e2e
+docs
+gen
+**/__pycache__
+**/.pytest_cache
