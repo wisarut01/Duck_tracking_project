@@ -38,12 +38,13 @@
 - **Phase 2a (2026-10-23):** หน้าเว็บต่อ API แล้วทุกหน้า
   - login / register / logout, token หมดอายุ (401) → กลับหน้า login แล้วกลับมาหน้าเดิม
   - board: โหลด issue, ลากการ์ด (optimistic + ย้อนกลับถ้า error), สร้าง issue, drawer แก้ field / comment / ยกเลิกลิงก์
-  - หน้า issue, หน้า docs (page tree, อ่าน, แก้ไข, สร้างหน้าใหม่, ยกเลิกลิงก์), ค้นหา (⌘K และ /search)
+  - หน้า issue, หน้า docs (page tree, อ่าน, แก้ไข, สร้างหน้าใหม่), ค้นหา (⌘K และ /search)
+  - ลิงก์ issue ↔ หน้า Docs ได้ทั้งสองฝั่ง (ปุ่ม Link → ค้นหาแล้วเลือก) และยกเลิกลิงก์ได้
+  - สร้าง project / space จากปุ่ม + ใน sidebar (เดา key จากชื่อ เช่น "Tracking Board" → TB)
   - โครง: `src/api/` (client จาก spec + react-query hooks) → `src/pages/` (ดึงข้อมูล) → `src/screens/` (UI อย่างเดียว ใช้ใน Storybook ด้วย fixtures)
 - **ยังไม่ทำ:**
-  - ปุ่ม "Link" issue ↔ page ยังไม่มีหน้าเลือก (API มีแล้ว) — ตอนนี้ยกเลิกลิงก์ได้อย่างเดียว
-  - ปุ่มสร้าง project / space ใน sidebar ยังไม่มีฟอร์ม
   - ยังไม่มี ESLint และ unit test
+  - `npm run dev:msw` (MSW) ตอบได้แค่อ่านข้อมูล, login และย้ายการ์ด — งานเขียนอื่นให้ใช้ mock API
 
 ### Backend — `services/mock-api/`, `proto/`
 - **ส่งแล้ว:**
@@ -67,7 +68,8 @@
 - **ผลทดสอบ:**
   - API ผ่าน 98/98
   - UI ผ่าน 2/2 รันกับ Storybook build ของ FE
-- **Phase 2a:** เพิ่ม project `app` (`e2e/app/app.spec.ts`) — E2E ผ่านเว็บจริง 6 ข้อ: login, 401 redirect, drag & drop, สร้าง issue + comment, mention ในหน้า doc, ค้นหา
+- **Phase 2a:** เพิ่ม project `app` (`e2e/app/app.spec.ts`) — E2E ผ่านเว็บจริง 9 ข้อ: login, 401 redirect, drag & drop, สร้าง issue + comment, mention ในหน้า doc, ค้นหา, ลิงก์จากทั้งสองฝั่ง, สร้าง project
+- ผลล่าสุด (2026-10-23, กับ `make up`): ทั้งชุด 116/116 ผ่าน (API 105, E2E 9, Storybook 2)
 - **ข้อควรรู้:** ถ้ารัน test ใน CI ต้องใช้ mock แยกของตัวเอง เพราะถ้ามีคน reset mock ที่ใช้ร่วมกันกลางทาง test จะตกแบบสุ่ม
 
 ## วิธีรัน

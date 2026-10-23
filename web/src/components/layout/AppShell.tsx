@@ -5,6 +5,7 @@ import { cn } from '@/lib/cn';
 import { useTheme } from '@/lib/useTheme';
 import type { IssueSummary, PageSummary } from '@/types/api';
 import { CommandPalette } from '@/components/search/CommandPalette';
+import { CreateProjectModal } from './CreateProjectModal';
 import { Sidebar, type SidebarProps } from './Sidebar';
 import { TopBar, type TopBarProps } from './TopBar';
 
@@ -45,7 +46,9 @@ export function AppShell({
   const [collapsed, setCollapsed] = useState(sidebar?.collapsed ?? false);
   const { isDark, toggle } = useTheme();
   const navigate = useNavigate();
-  const { projects, spaces, currentUser, onLogout, useSearch } = useAppData();
+  const { projects, spaces, currentUser, onLogout, onCreateProject, onCreateSpace, useSearch } = useAppData();
+  // ฟอร์มสร้าง project / space ที่เปิดอยู่ (count เปลี่ยนทุกครั้งที่เปิด → ฟอร์มเริ่มว่างใหม่)
+  const [creating, setCreating] = useState<{ kind: 'project' | 'space'; count: number }>();
   const search = useSearch(searchOpen ? query : ''); // ค้นเฉพาะตอน palette เปิด
 
   // คีย์ลัด ⌘K / Ctrl+K เปิดค้นหาจากทุกที่
@@ -64,7 +67,16 @@ export function AppShell({
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-canvas text-ink">
-      <Sidebar projects={projects} spaces={spaces} currentUser={currentUser} onLogout={onLogout} {...sidebar} collapsed={collapsed} />
+      <Sidebar
+        projects={projects}
+        spaces={spaces}
+        currentUser={currentUser}
+        onLogout={onLogout}
+        onCreateProject={onCreateProject && (() => setCreating({ kind: 'project', count: (creating?.count ?? 0) + 1 }))}
+        onCreateSpace={onCreateSpace && (() => setCreating({ kind: 'space', count: (creating?.count ?? 0) + 1 }))}
+        {...sidebar}
+        collapsed={collapsed}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
           breadcrumbs={breadcrumbs}
@@ -95,6 +107,16 @@ export function AppShell({
           closeSearch();
         }}
       />
+
+      {creating && (
+        <CreateProjectModal
+          key={creating.count}
+          kind={creating.kind}
+          open
+          onClose={() => setCreating(undefined)}
+          onSubmit={(request) => (creating.kind === 'project' ? onCreateProject?.(request) : onCreateSpace?.(request))}
+        />
+      )}
     </div>
   );
 }

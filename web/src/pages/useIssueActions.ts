@@ -1,5 +1,11 @@
 import { errorMessage } from '@/api/client';
-import { useAddCommentMutation, useMoveIssueMutation, useUnlinkMutation, useUpdateIssueMutation } from '@/api/queries';
+import {
+  useAddCommentMutation,
+  useLinkMutation,
+  useMoveIssueMutation,
+  useUnlinkMutation,
+  useUpdateIssueMutation,
+} from '@/api/queries';
 import type { IssueActions } from '@/components/issues/IssueDetailPanel';
 import { useToast } from '@/components/ui/Toast';
 import type { Issue } from '@/types/api';
@@ -11,6 +17,7 @@ export function useIssueActions(issue: Issue | undefined): IssueActions {
   const update = useUpdateIssueMutation(issueKey);
   const move = useMoveIssueMutation(issue?.projectKey ?? '');
   const addComment = useAddCommentMutation(issueKey);
+  const link = useLinkMutation();
   const unlink = useUnlinkMutation();
 
   if (!issue) return {};
@@ -21,6 +28,11 @@ export function useIssueActions(issue: Issue | undefined): IssueActions {
     onStatusChange: (status) =>
       move.mutate({ issueKey, move: { status } }, { onError: onError(`ย้าย ${issueKey} ไม่สำเร็จ`) }),
     onAddComment: (body) => addComment.mutate(body, { onError: onError('ส่ง comment ไม่สำเร็จ') }),
+    // mutateAsync → ถ้า error, LinkPickerModal โชว์ข้อความเองและเปิดค้างไว้
+    onLinkPage: async (page) => {
+      await link.mutateAsync({ issueKey, pageId: page.id });
+      toast({ tone: 'success', title: `ลิงก์ “${page.title}” แล้ว` });
+    },
     onUnlinkPage: (pageId) =>
       unlink.mutate(
         { issueKey, pageId },

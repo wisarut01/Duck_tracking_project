@@ -11,6 +11,9 @@ const fixtureAppData: AppData = {
   users,
   resolveIssue: findIssueByKey,
   useSearch: (query) => ({ results: query.trim() ? searchFixtures(query) : null, loading: false }),
+  // Storybook ไม่มี API — แค่ให้เปิดฟอร์มดูได้
+  onCreateProject: async () => {},
+  onCreateSpace: async () => {},
 };
 
 export function FixtureAppDataProvider({ children }: { children: ReactNode }) {

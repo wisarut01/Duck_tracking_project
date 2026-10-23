@@ -111,4 +111,55 @@ test.describe('web app (E2E)', () => {
     await page.getByRole('link', { name: `Find ${token}`, exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/issues/${issue.key}`));
   });
+
+  test('TC-LINK-011 link a page from the issue page, it shows up on the doc page too', { tag: '@P1' }, async ({ page, session, api, project, space }) => {
+    const issue = await createIssue(api, project.key);
+    const doc = await createPage(api, space.key, { title: `Link me ${uniqueToken()}` });
+    await loginWithToken(page, session.token);
+    await page.goto(`${WEB_URL}/issues/${issue.key}`);
+
+    await page.getByRole('button', { name: 'Link page' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('ค้นหา').fill(doc.title);
+    await dialog.getByRole('button', { name: new RegExp(doc.title) }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole('region', { name: 'Linked pages' }).getByRole('link', { name: doc.title })).toBeVisible();
+
+    await page.goto(`${WEB_URL}/spaces/${space.key}/pages/${doc.id}`);
+    await expect(page.getByRole('complementary', { name: 'Linked issues' }).getByText(issue.title)).toBeVisible();
+  });
+
+  test('TC-LINK-012 link an issue from the doc page', { tag: '@P1' }, async ({ page, session, api, project, space }) => {
+    const issue = await createIssue(api, project.key, { title: `Linkable ${uniqueToken()}` });
+    const doc = await createPage(api, space.key);
+    await loginWithToken(page, session.token);
+    await page.goto(`${WEB_URL}/spaces/${space.key}/pages/${doc.id}`);
+
+    await page.getByRole('button', { name: 'Link', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('ค้นหา').fill(issue.key);
+    await dialog.getByRole('button', { name: new RegExp(issue.key) }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole('complementary', { name: 'Linked issues' }).getByText(issue.title)).toBeVisible();
+
+    const links = await expectResponse<any[]>(await api.get(`/issues/${issue.key}/links`), 200, 'PageSummary[]');
+    expect(links.map((p) => p.id)).toEqual([doc.id]);
+  });
+
+  test('TC-PROJ-008 create a project from the sidebar and land on its board', { tag: '@P1' }, async ({ page, session }) => {
+    const name = `QA UI ${uniqueToken()}`;
+    await loginWithToken(page, session.token);
+    await page.goto(`${WEB_URL}/`);
+
+    await page.getByRole('button', { name: 'สร้าง project' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel(/ชื่อ project/).fill(name);
+    await expect(dialog.getByLabel(/Key/)).toHaveValue('QUQ'); // initials of "QA UI qa…"
+    const key = `Q${uniqueToken().slice(2, 8).toUpperCase()}`;
+    await dialog.getByLabel(/Key/).fill(key);
+    await dialog.getByRole('button', { name: 'สร้าง project' }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/projects/${key}/board`));
+    await expect(page.getByRole('heading', { name })).toBeVisible();
+  });
 });

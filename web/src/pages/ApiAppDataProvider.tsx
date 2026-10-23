@@ -1,9 +1,20 @@
 import { useMemo, type ReactNode } from 'react';
+import { useNavigate } from 'react-router';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { Issue, IssueList, IssueSummary } from '@/types/api';
 import { AppDataProvider, type AppData } from '@/lib/appData';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
-import { queryKeys, useMe, useProjects, useSearch, useSpaces, useUsers } from '@/api/queries';
+import {
+  queryKeys,
+  useCreateProjectMutation,
+  useCreateSpaceMutation,
+  useMe,
+  useProjects,
+  useSearch,
+  useSpaces,
+  useUsers,
+} from '@/api/queries';
+import { useToast } from '@/components/ui/Toast';
 import { setToken } from '@/api/token';
 
 /** หา issue ที่โหลดไว้แล้วใน cache (จาก GET /issues/{key} หรือรายการบน board) — ไม่ยิง API เพิ่ม */
@@ -35,6 +46,11 @@ export function ApiAppDataProvider({ children }: { children: ReactNode }) {
   const spaces = useSpaces();
   const me = useMe();
   const users = useUsers();
+  const navigate = useNavigate();
+  const toast = useToast();
+  // mutateAsync เป็นฟังก์ชันเดิมทุก render → ใส่ใน useMemo ได้โดยไม่ทำให้ value เปลี่ยนบ่อย
+  const { mutateAsync: createProject } = useCreateProjectMutation();
+  const { mutateAsync: createSpace } = useCreateSpaceMutation();
 
   const value = useMemo<AppData>(
     () => ({
@@ -44,12 +60,22 @@ export function ApiAppDataProvider({ children }: { children: ReactNode }) {
       users: users.data ?? [],
       resolveIssue: (issueKey) => findCachedIssue(queryClient, issueKey),
       useSearch: useApiSearch,
+      onCreateProject: async (request) => {
+        const project = await createProject(request);
+        toast({ tone: 'success', title: `สร้าง project ${project.key} แล้ว` });
+        navigate(`/projects/${project.key}/board`);
+      },
+      onCreateSpace: async (request) => {
+        const space = await createSpace(request);
+        toast({ tone: 'success', title: `สร้าง space ${space.key} แล้ว` });
+        navigate(`/spaces/${space.key}`);
+      },
       onLogout: () => {
         setToken(null); // RequireAuth เห็นว่าไม่มี token → พาไปหน้า login
         queryClient.clear();
       },
     }),
-    [projects.data, spaces.data, me.data, users.data, queryClient],
+    [projects.data, spaces.data, me.data, users.data, queryClient, createProject, createSpace, navigate, toast],
   );
 
   return <AppDataProvider value={value}>{children}</AppDataProvider>;

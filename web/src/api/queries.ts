@@ -10,6 +10,8 @@ import { useQuery, useMutation, useQueryClient, useQueries, type QueryClient } f
 import type {
   CreateIssueRequest,
   CreatePageRequest,
+  CreateProjectRequest,
+  CreateSpaceRequest,
   Issue,
   IssueList,
   LoginRequest,
@@ -80,6 +82,14 @@ export function useUsers() {
 }
 
 // ---------- projects / issues ----------
+
+export function useCreateProjectMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateProjectRequest) => unwrap(api.POST('/projects', { body })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.projects }),
+  });
+}
 
 export function useProjects() {
   return useQuery({ queryKey: queryKeys.projects, queryFn: () => unwrap(api.GET('/projects')) });
@@ -196,6 +206,20 @@ export function useIssueLinks(issueKey: string | undefined) {
   });
 }
 
+/** ลิงก์ issue ↔ page — โหลดใหม่ทั้งสองฝั่ง */
+export function useLinkMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ issueKey, pageId }: { issueKey: string; pageId: string }) =>
+      unwrap(api.POST('/issues/{issueKey}/links', { params: { path: { issueKey } }, body: { pageId } })),
+    onSuccess: (_page, { issueKey, pageId }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.issueLinks(issueKey) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.pageLinkedIssues(pageId) });
+      invalidateIssues(queryClient); // linkedPageCount เปลี่ยน
+    },
+  });
+}
+
 /** ยกเลิกลิงก์ issue ↔ page — โหลดใหม่ทั้งสองฝั่ง */
 export function useUnlinkMutation() {
   const queryClient = useQueryClient();
@@ -211,6 +235,14 @@ export function useUnlinkMutation() {
 }
 
 // ---------- docs ----------
+
+export function useCreateSpaceMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateSpaceRequest) => unwrap(api.POST('/spaces', { body })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.spaces }),
+  });
+}
 
 export function useSpaces() {
   return useQuery({ queryKey: queryKeys.spaces, queryFn: () => unwrap(api.GET('/spaces')) });

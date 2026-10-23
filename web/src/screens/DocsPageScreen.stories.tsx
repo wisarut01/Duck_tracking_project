@@ -14,6 +14,7 @@ const meta = {
     onSelectPage: fn(),
     onCreatePage: fn(),
     onSavePage: fn(),
+    onLinkIssue: fn(),
     onUnlinkIssue: fn(),
   },
   parameters: { layout: 'fullscreen' },

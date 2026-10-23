@@ -26,6 +26,7 @@ import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { TextArea } from '@/components/ui/TextArea';
 import { MarkdownView } from '@/components/docs/MarkdownView';
+import { LinkPickerModal } from '@/components/links/LinkPickerModal';
 import { IssueTypeIcon } from './IssueTypeIcon';
 import { PriorityIcon } from './PriorityIcon';
 import { StatusPill } from './StatusPill';
@@ -44,7 +45,8 @@ export interface IssueDetailPanelProps {
   /** เปลี่ยน status → POST /issues/{key}/move */
   onStatusChange?: (status: IssueStatus) => void;
   onAddComment?: (body: string) => void;
-  onLinkPage?: () => void;
+  /** ลิงก์หน้า Docs ที่เลือกจากหน้าค้นหา — ไม่ส่งมา = ไม่มีปุ่ม "Link page" */
+  onLinkPage?: (page: PageSummary) => Promise<unknown> | void;
   onUnlinkPage?: (pageId: string) => void;
   /** ถ้ามี จะแสดงปุ่ม × (ใช้ตอนเปิดเป็น drawer ข้าง board) */
   onClose?: () => void;
@@ -258,20 +260,30 @@ function SectionTitle({ children, icon, count, action }: { children: ReactNode; 
 
 interface LinkedPagesSectionProps {
   pages: PageSummary[];
-  onLink?: () => void;
+  onLink?: (page: PageSummary) => Promise<unknown> | void;
   onUnlink?: (pageId: string) => void;
 }
 
-/** หน้า Docs ที่ลิงก์กับ issue — แสดงเป็น "โน้ตกระดาษ" เล็กๆ */
+/** หน้า Docs ที่ลิงก์กับ issue — แสดงเป็น "โน้ตกระดาษ" เล็กๆ; ปุ่ม "Link page" เปิดหน้าค้นหาหน้า Docs */
 export function LinkedPagesSection({ pages, onLink, onUnlink }: LinkedPagesSectionProps) {
+  const [pickerOpen, setPickerOpen] = useState(false);
   return (
     <section aria-label="Linked pages">
+      {onLink && (
+        <LinkPickerModal
+          kind="page"
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          excludeIds={pages.map((page) => page.id)}
+          onSelect={onLink}
+        />
+      )}
       <SectionTitle
         icon={<Link2 size={15} aria-hidden />}
         count={pages.length}
         action={
           onLink && (
-            <Button variant="ghost" size="sm" leftIcon={<Plus size={14} aria-hidden />} onClick={onLink}>
+            <Button variant="ghost" size="sm" leftIcon={<Plus size={14} aria-hidden />} onClick={() => setPickerOpen(true)}>
               Link page
             </Button>
           )

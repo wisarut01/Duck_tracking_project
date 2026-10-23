@@ -10,7 +10,7 @@ const meta = {
     issue: issueTB12,
     comments: commentsTB12,
     linkedPages: linkedPagesTB12,
-    actions: { onUpdate: fn(), onStatusChange: fn(), onAddComment: fn(), onUnlinkPage: fn() },
+    actions: { onUpdate: fn(), onStatusChange: fn(), onAddComment: fn(), onLinkPage: fn(), onUnlinkPage: fn() },
   },
   parameters: { layout: 'fullscreen' },
 } satisfies Meta<typeof IssueDetailScreen>;

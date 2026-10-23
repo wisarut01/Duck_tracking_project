@@ -5,7 +5,7 @@ Test plan & test case IDs: [`../docs/qa/TEST_PLAN.md`](../docs/qa/TEST_PLAN.md)
 | Project | Folder | Target | What |
 |---|---|---|---|
 | `api` | `api/` | `API_BASE_URL` (default `http://localhost:4010/api/v1`) | contract / API tests. Every response body is validated against `../api/openapi.yaml` component schemas (Ajv, OAS 3.0 `nullable` handled) |
-| `app` | `app/` | `WEB_URL` (default `http://localhost:5173`) + `API_BASE_URL` | E2E through the real web app: login, 401 redirect, drag & drop, create issue + comment, doc mentions, search. Needs the web app and the API running (`make up`) |
+| `app` | `app/` | `WEB_URL` (default `http://localhost:5173`) + `API_BASE_URL` | E2E through the real web app: login, 401 redirect, drag & drop, create issue + comment, doc mentions, search, linking from both sides, create project. Needs the web app and the API running (`make up`) |
 | `ui` | `ui/` | `STORYBOOK_URL` (default `http://localhost:6006`) | Storybook smoke: reads `/index.json`, opens **every** story iframe, fails on page errors / `console.error` / Storybook error overlay. Skips if Storybook is not running |
 
 `api/contract.spec.ts` runs offline (it needs no server). It checks that the spec compiles and that its examples match its own schemas.

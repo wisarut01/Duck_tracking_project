@@ -53,6 +53,8 @@ export function ProjectBoardScreen({
 }: ProjectBoardScreenProps) {
   const { users, currentUser, resolveIssue } = useAppData();
   const [createOpen, setCreateOpen] = useState(false);
+  // เพิ่มทุกครั้งที่เปิดฟอร์ม → ใช้เป็น key ให้ฟอร์มเริ่มว่างใหม่ ไม่ค้างค่าจากครั้งก่อน
+  const [createCount, setCreateCount] = useState(0);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string>();
   // ตัวกรอง: assignee (id) และ type
@@ -65,6 +67,12 @@ export function ProjectBoardScreen({
   const openIssue = issues.find((issue) => issue.key === openIssueKey);
   // KanbanBoard เก็บลำดับการ์ดใน state ของตัวเอง → เปลี่ยน key เมื่อข้อมูลเปลี่ยนเพื่อให้เริ่มใหม่จาก props ล่าสุด
   const boardKey = visibleIssues.map((issue) => `${issue.key}:${issue.status}:${issue.position}`).join(',');
+
+  function openCreate() {
+    setCreateCount((count) => count + 1);
+    setCreateError(undefined);
+    setCreateOpen(true);
+  }
 
   async function handleCreate(request: CreateIssueRequest) {
     setCreating(true);
@@ -83,7 +91,7 @@ export function ProjectBoardScreen({
     <AppShell
       sidebar={{ activeProjectKey: project.key }}
       breadcrumbs={[{ label: project.name }, { label: 'Board' }]}
-      onCreate={() => setCreateOpen(true)}
+      onCreate={openCreate}
       onSelectIssue={(issue) => onOpenIssue?.(issue.key)}
       canvas
     >
@@ -144,7 +152,7 @@ export function ProjectBoardScreen({
             loading={loading}
             onMoveIssue={onMoveIssue}
             onOpenIssue={onOpenIssue}
-            onAddIssue={() => setCreateOpen(true)}
+            onAddIssue={openCreate}
           />
         </div>
 
@@ -168,6 +176,7 @@ export function ProjectBoardScreen({
       </div>
 
       <CreateIssueModal
+        key={createCount}
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         projectKey={project.key}

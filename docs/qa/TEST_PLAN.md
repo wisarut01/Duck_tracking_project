@@ -103,6 +103,7 @@ Test data: ทุก test สร้าง user / project / space ของตั
 | TC-PROJ-005 | P1 | **When** key ผิด pattern (`bad-key`) **Then** 400 `VALIDATION_FAILED` | API |
 | TC-PROJ-006 | P1 | **When** `GET /projects/{ไม่มีอยู่}` **Then** 404 `NOT_FOUND` | API |
 | TC-PROJ-007 | P2 | **Given** project มี 2 issue **When** get project **Then** `issueCount` = 2 | API |
+| TC-PROJ-008 | P1 | **When** กด + ข้าง Projects ใน sidebar กรอกชื่อ (key ถูกเดาจากชื่อ) แล้วสร้าง **Then** ไปที่ board ของ project ใหม่ | E2E (`app/app.spec.ts`) |
 
 ### 7.3 Issues CRUD (`e2e/api/issues.spec.ts`)
 
@@ -197,7 +198,8 @@ Test data: ทุก test สร้าง user / project / space ของตั
 | TC-LINK-008 | P2 | **Then** `Issue.linkedPageCount` = จำนวนลิงก์ | API |
 | TC-LINK-009 | P2 | **When** ลบ page ที่ถูกลิงก์ **Then** หายจาก `/issues/{key}/links` (ไม่มี orphan ข้าม service) | API |
 | TC-LINK-010 | P2 | **When** ลบ issue ที่ถูกลิงก์ **Then** หายจาก `/pages/{id}/linked-issues` | API |
-| TC-LINK-011 | P1 | **Given** หน้า issue **When** กด “Link page” เลือกหน้า **Then** เห็นใน panel ของ issue และเปิดหน้า doc เห็น issue ใน “Linked issues” | E2E (P2) |
+| TC-LINK-011 | P1 | **Given** หน้า issue **When** กด “Link page” เลือกหน้า **Then** เห็นใน panel ของ issue และเปิดหน้า doc เห็น issue ใน “Linked issues” | E2E (`app/app.spec.ts`) |
+| TC-LINK-012 | P1 | **Given** หน้า doc **When** กด “Link” เลือก issue **Then** เห็นใน “Linked issues” และ `GET /issues/{key}/links` มีหน้านี้ | E2E (`app/app.spec.ts`) |
 
 ### 7.8 `TB-12` mention auto-link
 

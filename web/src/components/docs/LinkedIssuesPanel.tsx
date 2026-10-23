@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { Link2, Plus, Unlink } from 'lucide-react';
 import type { IssueSummary } from '@/types/api';
 import { Avatar } from '@/components/ui/Avatar';
@@ -8,12 +8,13 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { IssueMentionChip } from '@/components/issues/IssueMentionChip';
 import { IssueTypeIcon } from '@/components/issues/IssueTypeIcon';
 import { StatusPill } from '@/components/issues/StatusPill';
+import { LinkPickerModal } from '@/components/links/LinkPickerModal';
 
 export interface LinkedIssuesPanelProps {
   /** จาก GET /pages/{pageId}/linked-issues */
   issues: IssueSummary[];
-  /** ปุ่ม "Link issue" */
-  onLink?: () => void;
+  /** ลิงก์ issue ที่เลือกจากหน้าค้นหา (POST /issues/{key}/links) — ไม่ส่งมา = ไม่มีปุ่ม "Link" */
+  onLink?: (issue: IssueSummary) => Promise<unknown> | void;
   /** ยกเลิกลิงก์ (DELETE /issues/{key}/links/{pageId}) */
   onUnlink?: (issueKey: string) => void;
   loading?: boolean;
@@ -22,8 +23,18 @@ export interface LinkedIssuesPanelProps {
 /** กล่องรายการ issue ที่ลิงก์กับหน้า Docs นี้ (แสดงด้านขวาของหน้า) */
 export function LinkedIssuesPanel({ issues, onLink, onUnlink, loading = false }: LinkedIssuesPanelProps) {
   const headingId = useId();
+  const [pickerOpen, setPickerOpen] = useState(false);
   return (
     <section aria-labelledby={headingId} className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+      {onLink && (
+        <LinkPickerModal
+          kind="issue"
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          excludeIds={issues.map((issue) => issue.key)}
+          onSelect={onLink}
+        />
+      )}
       <header className="mb-3 flex items-center gap-2">
         <Link2 size={16} className="text-ink-subtle" aria-hidden />
         <h2 id={headingId} className="text-sm font-bold text-ink">
@@ -31,7 +42,7 @@ export function LinkedIssuesPanel({ issues, onLink, onUnlink, loading = false }:
         </h2>
         {!loading && <span className="rounded-full bg-surface-muted px-2 text-xs font-bold text-ink-muted">{issues.length}</span>}
         {onLink && (
-          <Button variant="ghost" size="sm" className="ml-auto" leftIcon={<Plus size={14} aria-hidden />} onClick={onLink}>
+          <Button variant="ghost" size="sm" className="ml-auto" leftIcon={<Plus size={14} aria-hidden />} onClick={() => setPickerOpen(true)}>
             Link
           </Button>
         )}

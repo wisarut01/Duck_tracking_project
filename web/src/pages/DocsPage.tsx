@@ -2,6 +2,7 @@ import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router'
 import { errorMessage } from '@/api/client';
 import {
   useCreatePageMutation,
+  useLinkMutation,
   useMentionedIssues,
   usePage,
   usePageLinkedIssues,
@@ -32,6 +33,7 @@ export function DocsPage() {
 
   const createPage = useCreatePageMutation(spaceKey);
   const updatePage = useUpdatePageMutation(pageId ?? '');
+  const link = useLinkMutation();
   const unlink = useUnlinkMutation();
 
   const pageUrl = (id: string) => `/spaces/${spaceKey}/pages/${id}`;
@@ -72,6 +74,10 @@ export function DocsPage() {
         }
         toast({ tone: 'success', title: 'บันทึกหน้าแล้ว' });
         if (params.has('edit')) navigate(pageUrl(pageId!), { replace: true });
+      }}
+      onLinkIssue={async (issue) => {
+        await link.mutateAsync({ issueKey: issue.key, pageId: pageId! }); // error → หน้าเลือก issue โชว์เอง
+        toast({ tone: 'success', title: `ลิงก์ ${issue.key} แล้ว` });
       }}
       onUnlinkIssue={(issueKey) =>
         unlink.mutate(

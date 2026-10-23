@@ -27,6 +27,8 @@ export interface DocsPageScreenProps {
   onCreatePage?: (parentId: string | null) => void;
   /** บันทึกหน้า — throw เมื่อไม่สำเร็จ แล้ว editor จะยังเปิดค้างไว้ */
   onSavePage?: (changes: UpdatePageRequest) => Promise<unknown> | void;
+  /** ลิงก์ issue กับหน้านี้ — throw เมื่อไม่สำเร็จ แล้วหน้าเลือก issue จะโชว์ error */
+  onLinkIssue?: (issue: IssueSummary) => Promise<unknown> | void;
   onUnlinkIssue?: (issueKey: string) => void;
 }
 
@@ -45,6 +47,7 @@ export function DocsPageScreen({
   onSelectPage,
   onCreatePage,
   onSavePage,
+  onLinkIssue,
   onUnlinkIssue,
 }: DocsPageScreenProps) {
   const { resolveIssue } = useAppData();
@@ -124,7 +127,7 @@ export function DocsPageScreen({
         {page && (
           <aside aria-label="Linked issues" className="hidden w-80 shrink-0 p-6 pl-0 xl:block">
             <div className="sticky top-6">
-              <LinkedIssuesPanel issues={linkedIssues} loading={loadingLinkedIssues} onUnlink={onUnlinkIssue} />
+              <LinkedIssuesPanel issues={linkedIssues} loading={loadingLinkedIssues} onLink={onLinkIssue} onUnlink={onUnlinkIssue} />
             </div>
           </aside>
         )}

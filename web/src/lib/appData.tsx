@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import type { IssueSummary, Project, SearchResult, Space, User } from '@/types/api';
+import type { CreateProjectRequest, CreateSpaceRequest, IssueSummary, Project, SearchResult, Space, User } from '@/types/api';
 
 /**
  * ข้อมูลที่ทุกหน้าใช้ร่วมกัน: เมนูซ้าย, ผู้ใช้, รายชื่อคน, การค้นหา, การแปลง TB-12 เป็นข้อมูล issue
@@ -19,6 +19,9 @@ export interface AppData {
   /** hook ค้นหา — ถูกเรียกทุก render เหมือน hook ปกติ */
   useSearch: (query: string) => { results: SearchResult | null; loading: boolean };
   onLogout?: () => void;
+  /** ปุ่ม + ใน sidebar — ไม่ส่งมา = ไม่มีปุ่ม; throw เมื่อไม่สำเร็จ แล้วฟอร์มจะโชว์ error */
+  onCreateProject?: (request: CreateProjectRequest) => Promise<unknown>;
+  onCreateSpace?: (request: CreateSpaceRequest) => Promise<unknown>;
 }
 
 const empty: AppData = {
