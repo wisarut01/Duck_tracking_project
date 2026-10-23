@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { useAppData } from '@/lib/appData';
 import { cn } from '@/lib/cn';
+import { MD_UP, useMediaQuery } from '@/lib/useMediaQuery';
 import { useTheme } from '@/lib/useTheme';
 import type { IssueSummary, PageSummary } from '@/types/api';
 import { CommandPalette } from '@/components/search/CommandPalette';
@@ -28,6 +29,7 @@ export interface AppShellProps {
 
 /**
  * โครงหน้าหลักของแอป: Sidebar ซ้าย + TopBar บน + เนื้อหา
+ * จอเล็กกว่า md (มือถือ): Sidebar ซ่อนไว้ กดปุ่มเมนูแล้วเลื่อนออกมาทับเนื้อหา
  * จัดการ ⌘K / Ctrl+K เปิดค้นหา (ผลค้นหามาจาก AppData) และปุ่มสลับธีมให้เอง
  */
 export function AppShell({
@@ -44,6 +46,17 @@ export function AppShell({
   const [searchOpen, setSearchOpen] = useState(defaultSearchOpen);
   const [query, setQuery] = useState(defaultSearchQuery);
   const [collapsed, setCollapsed] = useState(sidebar?.collapsed ?? false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const isDesktop = useMediaQuery(MD_UP);
+  const location = useLocation();
+
+  // เปลี่ยนหน้าแล้วปิดเมนูมือถือ (เช่น กดเลือก project ในเมนู)
+  // ตั้ง state ระหว่าง render แทน useEffect — วิธีที่ React แนะนำเมื่อ state ขึ้นกับ props/ค่าภายนอก
+  const [lastPath, setLastPath] = useState(location.pathname);
+  if (lastPath !== location.pathname) {
+    setLastPath(location.pathname);
+    setMobileNavOpen(false);
+  }
   const { isDark, toggle } = useTheme();
   const navigate = useNavigate();
   const { projects, spaces, currentUser, onLogout, onCreateProject, onCreateSpace, useSearch } = useAppData();
@@ -58,25 +71,39 @@ export function AppShell({
         event.preventDefault();
         setSearchOpen(true);
       }
+      if (event.key === 'Escape') setMobileNavOpen(false);
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const closeSearch = () => setSearchOpen(false);
+  const openCreate = (kind: 'project' | 'space') => setCreating({ kind, count: (creating?.count ?? 0) + 1 });
+  const sidebarProps: SidebarProps = {
+    projects,
+    spaces,
+    currentUser,
+    onLogout,
+    onCreateProject: onCreateProject && (() => openCreate('project')),
+    onCreateSpace: onCreateSpace && (() => openCreate('space')),
+    ...sidebar,
+  };
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-canvas text-ink">
-      <Sidebar
-        projects={projects}
-        spaces={spaces}
-        currentUser={currentUser}
-        onLogout={onLogout}
-        onCreateProject={onCreateProject && (() => setCreating({ kind: 'project', count: (creating?.count ?? 0) + 1 }))}
-        onCreateSpace={onCreateSpace && (() => setCreating({ kind: 'space', count: (creating?.count ?? 0) + 1 }))}
-        {...sidebar}
-        collapsed={collapsed}
-      />
+      {/* จอใหญ่: อยู่ด้านซ้ายตลอด (ย่อเป็นไอคอนได้) */}
+      <div className="hidden md:flex">
+        <Sidebar {...sidebarProps} collapsed={collapsed} />
+      </div>
+      {/* มือถือ: เมนูเลื่อนออกมาทับเนื้อหา กดพื้นหลังหรือ Esc เพื่อปิด */}
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-40 flex md:hidden">
+          <div className="absolute inset-0 bg-black/40" aria-hidden onClick={() => setMobileNavOpen(false)} />
+          <div className="animate-pop-in relative h-full w-72 max-w-[85vw] shadow-lg">
+            <Sidebar {...sidebarProps} collapsed={false} />
+          </div>
+        </div>
+      )}
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
           breadcrumbs={breadcrumbs}
@@ -84,7 +111,7 @@ export function AppShell({
           onCreate={onCreate}
           onToggleTheme={toggle}
           isDark={isDark}
-          onToggleSidebar={() => setCollapsed((value) => !value)}
+          onToggleSidebar={() => (isDesktop ? setCollapsed((value) => !value) : setMobileNavOpen(true))}
         />
         <main className={cn('min-h-0 flex-1 overflow-auto', canvas ? 'bg-dot-grid' : 'bg-canvas')}>{children}</main>
       </div>

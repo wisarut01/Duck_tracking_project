@@ -163,3 +163,41 @@ test.describe('web app (E2E)', () => {
     await expect(page.getByRole('heading', { name })).toBeVisible();
   });
 });
+
+test.describe('web app on a phone (E2E)', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+  test('TC-UI-003 no sideways page scroll and long titles stay inside cards', { tag: '@P1' }, async ({ page, session, api, project, space }) => {
+    const issue = await createIssue(api, project.key, {
+      title: `https://example.com/${'very-long-path-'.repeat(8)} ${uniqueToken()}`,
+      labels: ['a-really-long-label-name-without-any-spaces'],
+    });
+    const doc = await createPage(api, space.key);
+    await loginWithToken(page, session.token);
+
+    for (const path of [`/projects/${project.key}/board`, `/issues/${issue.key}`, `/spaces/${space.key}/pages/${doc.id}`, '/search?q=x']) {
+      await page.goto(`${WEB_URL}${path}`);
+      await page.waitForLoadState('networkidle');
+      const sideways = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+      expect(sideways, `${path} scrolls sideways`).toBe(false);
+    }
+
+    await page.goto(`${WEB_URL}/projects/${project.key}/board`);
+    const card = page.getByRole('button', { name: new RegExp(issue.key) });
+    const title = card.locator('p').first();
+    const [cardBox, titleBox] = [(await card.boundingBox())!, (await title.boundingBox())!];
+    expect(titleBox.x + titleBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
+  });
+
+  test('TC-UI-004 the menu opens from the top bar and closes after picking a page', { tag: '@P1' }, async ({ page, session, project, space }) => {
+    await loginWithToken(page, session.token);
+    await page.goto(`${WEB_URL}/projects/${project.key}/board`);
+
+    await expect(page.getByRole('navigation', { name: 'เมนูหลัก' })).toBeHidden();
+    await page.getByRole('button', { name: 'เปิด/ย่อเมนู' }).click();
+    const menu = page.getByRole('navigation', { name: 'เมนูหลัก' });
+    await menu.getByRole('link', { name: new RegExp(space.name) }).click();
+    await expect(page).toHaveURL(new RegExp(`/spaces/${space.key}`));
+    await expect(menu).toBeHidden();
+  });
+});

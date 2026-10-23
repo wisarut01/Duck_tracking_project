@@ -41,7 +41,7 @@ export function IssueCard({
   return (
     <div
       className={cn(
-        'group relative flex flex-col gap-2.5 rounded-lg p-3 text-left',
+        'group relative flex min-w-0 flex-col gap-2.5 rounded-lg p-3 text-left',
         'shadow-sm transition-[box-shadow,transform,opacity] duration-150',
         'hover:-translate-y-0.5 hover:shadow-md',
         sticky.bg,
@@ -60,7 +60,8 @@ export function IssueCard({
         {showStatus && <StatusPill status={issue.status} size="sm" className="ml-auto" />}
       </div>
 
-      <p className="line-clamp-3 text-sm leading-snug font-semibold text-ink">{issue.title}</p>
+      {/* wrap-anywhere = คำยาวที่ไม่มีช่องว่าง (URL, ชื่อไฟล์) ตัดขึ้นบรรทัดใหม่ได้ ไม่ล้นการ์ด */}
+      <p className="line-clamp-3 text-sm leading-snug font-semibold wrap-anywhere text-ink">{issue.title}</p>
 
       {labels.length > 0 && (
         <div className="flex flex-wrap gap-1">
@@ -68,9 +69,10 @@ export function IssueCard({
             // บนการ์ดสีอยู่แล้ว → ใช้ป้ายพื้นขาวโปร่ง ไม่แย่งสีกับ sticky note
             <span
               key={label}
-              className="inline-flex h-5 items-center rounded-full bg-surface/75 px-2 text-[11px] font-semibold text-ink-muted dark:bg-black/25"
+              title={label}
+              className="inline-flex h-5 max-w-full items-center rounded-full bg-surface/75 px-2 text-[11px] font-semibold text-ink-muted dark:bg-black/25"
             >
-              {label}
+              <span className="truncate">{label}</span>
             </span>
           ))}
         </div>

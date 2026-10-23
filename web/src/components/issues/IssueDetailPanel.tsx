@@ -86,8 +86,9 @@ export function IssueDetailPanel({
   const isPage = layout === 'page';
   const titleId = useId();
 
+  // drawer: field เรียง 2 คอลัมน์ (จอ sm ขึ้นไป) หน้าจะได้สั้นลง ไม่ต้องเลื่อนไกล
   const fields = (
-    <dl className="flex flex-col gap-4">
+    <dl className={cn('grid grid-cols-1 gap-4', !isPage && 'sm:grid-cols-2')}>
       <FieldRow label="Status">
         <Select
           aria-label="Status"
@@ -154,7 +155,7 @@ export function IssueDetailPanel({
           {issue.reporter.displayName}
         </span>
       </FieldRow>
-      <FieldRow label="Labels">
+      <FieldRow label="Labels" className={cn(!isPage && 'sm:col-span-2')}>
         {issue.labels.length > 0 ? (
           <div className="flex flex-wrap gap-1">
             {issue.labels.map((label) => (
@@ -167,7 +168,7 @@ export function IssueDetailPanel({
           <span className="text-sm text-ink-subtle">ไม่มี</span>
         )}
       </FieldRow>
-      <div className="flex flex-col gap-1 border-t border-dashed border-border pt-3 text-xs text-ink-subtle">
+      <div className={cn('flex flex-col gap-1 border-t border-dashed border-border pt-3 text-xs text-ink-subtle', !isPage && 'sm:col-span-2')}>
         <span>สร้างเมื่อ {formatDate(issue.createdAt)}</span>
         <span>อัปเดตล่าสุด {formatDateTime(issue.updatedAt)}</span>
       </div>
@@ -179,17 +180,24 @@ export function IssueDetailPanel({
       aria-labelledby={titleId}
       className={cn(
         'flex flex-col bg-surface',
-        isPage ? 'rounded-2xl border border-border shadow-sm' : 'h-full w-full max-w-xl border-l border-border shadow-lg',
+        isPage ? 'rounded-2xl border border-border shadow-sm' : 'h-full w-full max-w-xl overflow-y-auto border-l border-border shadow-lg',
       )}
     >
       {/* Header */}
-      <header className="flex items-start gap-3 border-b border-border px-6 py-4">
+      {/* หัวข้อค้างอยู่ด้านบนตอนเลื่อน — รู้ตลอดว่ากำลังดู issue ไหน และกดปิดได้เสมอ */}
+      <header
+        className={cn(
+          'sticky top-0 z-10 flex items-start gap-3 border-b border-border bg-surface/95 px-4 py-4 backdrop-blur-sm sm:px-6',
+          isPage && 'rounded-t-2xl',
+        )}
+      >
         <div className="min-w-0 flex-1">
           <div className="mb-1.5 flex items-center gap-2 text-sm">
             <IssueTypeIcon type={type} />
             <span className="font-mono font-bold text-ink-muted">{issue.key}</span>
           </div>
-          <h1 id={titleId} className="text-xl font-extrabold text-ink">
+          {/* หัวข้อค้างอยู่บนจอ → ชื่อยาวมากตัดที่ 3 บรรทัด (ชี้ค้างเพื่อดูเต็ม) จะได้ไม่บังเนื้อหา */}
+          <h1 id={titleId} title={issue.title} className="line-clamp-3 text-xl font-extrabold wrap-anywhere text-ink">
             {issue.title}
           </h1>
         </div>
@@ -202,7 +210,7 @@ export function IssueDetailPanel({
 
       <div className={cn('flex flex-1 flex-col gap-0', isPage && 'lg:flex-row')}>
         {/* Main column */}
-        <div className="flex min-w-0 flex-1 flex-col gap-8 px-6 py-5">
+        <div className="flex min-w-0 flex-1 flex-col gap-8 px-4 py-5 sm:px-6">
           {!isPage && <div className="rounded-xl bg-surface-muted/60 p-4">{fields}</div>}
 
           <section aria-label="Description">
@@ -227,7 +235,7 @@ export function IssueDetailPanel({
 
         {/* Side column (layout=page) */}
         {isPage && (
-          <aside aria-label="Details" className="w-full shrink-0 border-t border-border px-6 py-5 lg:w-72 lg:border-t-0 lg:border-l">
+          <aside aria-label="Details" className="w-full shrink-0 border-t border-border px-4 py-5 sm:px-6 lg:w-72 lg:border-t-0 lg:border-l">
             {fields}
           </aside>
         )}
@@ -238,9 +246,9 @@ export function IssueDetailPanel({
 
 // ---------- sub components (ใช้ภายในไฟล์ + export ไว้ใช้ที่อื่นได้) ----------
 
-function FieldRow({ label, children }: { label: string; children: ReactNode }) {
+function FieldRow({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className={cn('flex min-w-0 flex-col gap-1', className)}>
       <dt className="text-xs font-bold tracking-wide text-ink-subtle uppercase">{label}</dt>
       <dd>{children}</dd>
     </div>

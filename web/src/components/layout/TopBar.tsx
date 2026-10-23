@@ -20,9 +20,9 @@ export interface TopBarProps {
 /** แถบบน: breadcrumb · ช่องค้นหา · ปุ่ม Create · สลับธีม */
 export function TopBar({ breadcrumbs = [], onOpenSearch, onCreate, onToggleTheme, isDark = false, onToggleSidebar, actions }: TopBarProps) {
   return (
-    <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-surface/85 px-4 backdrop-blur-md">
+    <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border bg-surface/85 px-3 backdrop-blur-md sm:gap-3 sm:px-4">
       {onToggleSidebar && (
-        <Button variant="ghost" size="sm" iconOnly aria-label="ย่อ/ขยายเมนู" onClick={onToggleSidebar}>
+        <Button variant="ghost" size="sm" iconOnly aria-label="เปิด/ย่อเมนู" onClick={onToggleSidebar}>
           <PanelLeft size={18} aria-hidden />
         </Button>
       )}
@@ -48,11 +48,11 @@ export function TopBar({ breadcrumbs = [], onOpenSearch, onCreate, onToggleTheme
         </nav>
       )}
 
-      <div className="flex flex-1 justify-center px-2">
+      <div className="flex min-w-0 flex-1 justify-center sm:px-2">
         <SearchBar onOpen={onOpenSearch} />
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2">
         {actions}
         {onToggleTheme && (
           <Tooltip content={isDark ? 'Light mode' : 'Dark mode'} side="bottom">
@@ -62,8 +62,9 @@ export function TopBar({ breadcrumbs = [], onOpenSearch, onCreate, onToggleTheme
           </Tooltip>
         )}
         {onCreate && (
-          <Button size="sm" leftIcon={<Plus size={16} aria-hidden />} onClick={onCreate}>
-            Create
+          // มือถือ: เหลือแค่ไอคอน + (ข้อความซ่อนไว้ แต่ screen reader ยังอ่าน "Create")
+          <Button size="sm" leftIcon={<Plus size={16} aria-hidden />} onClick={onCreate} aria-label="Create">
+            <span className="hidden sm:inline">Create</span>
           </Button>
         )}
       </div>

@@ -55,7 +55,7 @@ export function SearchResultsScreen({
       defaultSearchOpen={paletteOpen}
       defaultSearchQuery={defaultQuery}
     >
-      <div className="mx-auto max-w-4xl p-6">
+      <div className="mx-auto max-w-4xl p-4 sm:p-6">
         <h1 className="mb-4 text-2xl font-extrabold text-ink">ผลการค้นหา</h1>
         <Input
           aria-label="คำค้นหา"
@@ -110,9 +110,10 @@ export function SearchResultsScreen({
                       <Link to={`/issues/${issue.key}`} className="min-w-0 flex-1 truncate text-sm font-semibold text-ink hover:underline">
                         <Highlight text={issue.title} query={query} />
                       </Link>
-                      <PriorityIcon priority={issue.priority} />
+                      {/* มือถือ: ซ่อน priority / avatar ให้ title มีที่พอ */}
+                      <PriorityIcon priority={issue.priority} className="hidden sm:inline-flex" />
                       <StatusPill status={issue.status} size="sm" />
-                      <Avatar user={issue.assignee} size="sm" />
+                      <Avatar user={issue.assignee} size="sm" className="hidden sm:inline-flex" />
                     </li>
                   ))}
                 </ul>

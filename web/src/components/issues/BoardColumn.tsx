@@ -34,7 +34,8 @@ export function BoardColumn({ status, issues, onOpenIssue, onAddIssue, loading =
   return (
     <section
       aria-labelledby={headingId}
-      className="flex w-72 shrink-0 flex-col rounded-2xl border border-border bg-surface-muted/80 backdrop-blur-sm"
+      // มือถือ: คอลัมน์กว้างเกือบเต็มจอ เลื่อนซ้าย-ขวาทีละคอลัมน์ (snap)
+      className="flex w-[85vw] max-w-80 shrink-0 snap-start flex-col rounded-2xl border border-border bg-surface-muted/80 backdrop-blur-sm sm:w-72"
     >
       <header className="flex items-center gap-2 px-3 pt-3 pb-2">
         <span className={cn('inline-flex h-6 w-6 items-center justify-center rounded-md', sticky.bg, sticky.ink)}>

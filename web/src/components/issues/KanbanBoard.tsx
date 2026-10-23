@@ -3,7 +3,8 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   closestCorners,
   useSensor,
   useSensors,
@@ -73,7 +74,9 @@ export function KanbanBoard({ issues, onMoveIssue, onOpenIssue, onAddIssue, load
 
   const sensors = useSensors(
     // ต้องลากเกิน 5px ก่อนถึงจะนับว่า "ลาก" → คลิกเปิดการ์ดได้ตามปกติ
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    // นิ้ว: ต้องกดค้าง 250ms ก่อนถึงจะลาก — ปัดเฉยๆ ยังเลื่อน board ซ้าย-ขวาได้ตามปกติ
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
     // คีย์บอร์ด: Space หยิบ/วาง, ลูกศรย้าย, Esc ยกเลิก (Enter เก็บไว้เปิดการ์ด)
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
@@ -189,7 +192,7 @@ export function KanbanBoard({ issues, onMoveIssue, onOpenIssue, onAddIssue, load
         },
       }}
     >
-      <div className="flex items-start gap-4 overflow-x-auto pb-4">
+      <div className="flex snap-x snap-mandatory items-start gap-3 overflow-x-auto pb-4 sm:snap-none sm:gap-4">
         {ISSUE_STATUSES.map((status) => (
           <BoardColumn
             key={status}

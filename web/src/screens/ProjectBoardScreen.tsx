@@ -96,12 +96,12 @@ export function ProjectBoardScreen({
       canvas
     >
       <div className="flex h-full">
-        <div className="min-w-0 flex-1 p-6">
+        <div className="min-w-0 flex-1 p-4 sm:p-6">
           {/* หัวหน้า board */}
           <div className="mb-5 flex flex-wrap items-end gap-4">
-            <div className="mr-auto">
+            <div className="mr-auto min-w-0 basis-full sm:basis-auto">
               <p className="font-mono text-xs font-bold text-ink-subtle">{project.key}</p>
-              <h1 className="text-2xl font-extrabold text-ink">{project.name}</h1>
+              <h1 className="text-2xl font-extrabold wrap-anywhere text-ink">{project.name}</h1>
               {project.description && <p className="text-sm text-ink-muted">{project.description}</p>}
             </div>
 
@@ -156,8 +156,12 @@ export function ProjectBoardScreen({
           />
         </div>
 
+        {/* drawer: จอใหญ่ (lg+) อยู่ข้าง board, จอเล็กเปิดทับเต็มจอ */}
         {openIssue && (
-          <div className="sticky top-0 h-full shrink-0">
+          <div className="fixed inset-0 z-30 flex justify-end bg-black/30 lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-full lg:shrink-0 lg:bg-transparent"
+            // จอเล็ก: แตะพื้นหลังมืดๆ นอก drawer เพื่อปิด
+            onClick={(event) => event.target === event.currentTarget && onOpenIssue?.(undefined)}
+          >
             <IssueDetailPanel
               key={openIssue.key}
               layout="panel"

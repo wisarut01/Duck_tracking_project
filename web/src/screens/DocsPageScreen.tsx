@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, Pencil, Plus } from 'lucide-react';
+import { ChevronDown, FileText, Pencil, Plus } from 'lucide-react';
 import { useAppData } from '@/lib/appData';
 import { formatDate } from '@/lib/format';
 import type { IssueSummary, Page, PageTreeNode, Space, UpdatePageRequest } from '@/types/api';
@@ -53,6 +53,8 @@ export function DocsPageScreen({
   const { resolveIssue } = useAppData();
   const [editing, setEditing] = useState(defaultEditing);
   const [saving, setSaving] = useState(false);
+  // มือถือ: page tree ซ่อนไว้ กดปุ่มด้านบนเพื่อเปิด
+  const [treeOpen, setTreeOpen] = useState(false);
 
   async function handleSave(changes: UpdatePageRequest) {
     setSaving(true);
@@ -98,12 +100,12 @@ export function DocsPageScreen({
   } else {
     content = (
       <article className="mx-auto max-w-3xl">
-        <div className="mb-6 flex items-center gap-3 border-b border-dashed border-border pb-4">
+        <div className="mb-6 flex flex-wrap items-center gap-3 border-b border-dashed border-border pb-4">
           <Avatar user={page.author} size="sm" />
-          <span className="text-sm text-ink-muted">
+          <span className="min-w-0 flex-1 text-sm text-ink-muted">
             <b className="text-ink">{page.author.displayName}</b> · แก้ไขล่าสุด {formatDate(page.updatedAt)}
           </span>
-          <Button variant="secondary" size="sm" className="ml-auto" leftIcon={<Pencil size={14} aria-hidden />} onClick={() => setEditing(true)}>
+          <Button variant="secondary" size="sm" leftIcon={<Pencil size={14} aria-hidden />} onClick={() => setEditing(true)}>
             แก้ไข
           </Button>
         </div>
@@ -121,9 +123,45 @@ export function DocsPageScreen({
         </aside>
 
         {/* Content */}
-        <div className="min-w-0 flex-1 p-6 lg:p-10">{content}</div>
+        <div className="min-w-0 flex-1 p-4 sm:p-6 lg:p-10">
+          {/* มือถือ: ปุ่มเปิด page tree (จอ md ขึ้นไปมี tree อยู่ด้านซ้ายแล้ว) */}
+          <div className="mb-4 md:hidden">
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-expanded={treeOpen}
+              rightIcon={<ChevronDown size={14} aria-hidden className={treeOpen ? 'rotate-180' : undefined} />}
+              onClick={() => setTreeOpen((open) => !open)}
+            >
+              หน้าทั้งหมดใน {space.name}
+            </Button>
+            {treeOpen && (
+              <div className="mt-2 rounded-xl border border-border bg-surface p-2">
+                <PageTree
+                  label={space.name}
+                  nodes={tree}
+                  activeId={page?.id}
+                  onSelect={(pageId) => {
+                    setTreeOpen(false);
+                    onSelectPage?.(pageId);
+                  }}
+                  onCreatePage={onCreatePage}
+                />
+              </div>
+            )}
+          </div>
 
-        {/* Linked issues */}
+          {content}
+
+          {/* จอเล็กกว่า xl: linked issues อยู่ใต้เนื้อหา */}
+          {page && !editing && (
+            <div className="mx-auto mt-10 max-w-3xl xl:hidden">
+              <LinkedIssuesPanel issues={linkedIssues} loading={loadingLinkedIssues} onLink={onLinkIssue} onUnlink={onUnlinkIssue} />
+            </div>
+          )}
+        </div>
+
+        {/* จอ xl ขึ้นไป: linked issues อยู่ด้านขวา */}
         {page && (
           <aside aria-label="Linked issues" className="hidden w-80 shrink-0 p-6 pl-0 xl:block">
             <div className="sticky top-6">

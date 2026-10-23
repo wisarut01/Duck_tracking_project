@@ -255,6 +255,8 @@ Test data: ทุก test สร้าง user / project / space ของตั
 | TC-CONTRACT-004 | P1 | **Then** ทุก operation ประกาศ 401 (ถ้าต้อง login), 400 (ถ้ามี input), 404 (ถ้ามี path param) | API (offline) |
 | TC-UI-001 | P1 | **Given** Storybook รันอยู่ **Then** `/index.json` มีอย่างน้อย 1 story (ถ้าไม่รัน → skip) | UI-SB |
 | TC-UI-002 | P0 | **When** เปิด `/iframe.html?id=<id>` ของ **ทุก** story **Then** ไม่มี `pageerror`, `console.error`, หรือ Storybook error overlay | UI-SB |
+| TC-UI-003 | P1 | **Given** จอมือถือ 390px **Then** board / issue / doc / search ไม่เลื่อนซ้าย-ขวาทั้งหน้า และชื่อ issue ยาวๆ (URL) ไม่ล้นการ์ด | E2E (`app/app.spec.ts`) |
+| TC-UI-004 | P1 | **Given** จอมือถือ **When** กดปุ่มเมนูแล้วเลือก space **Then** ไปหน้านั้นและเมนูปิดเอง | E2E (`app/app.spec.ts`) |
 
 ## 8. Findings จากรอบแรก (2026-10-18, vs `services/mock-api`)
 
