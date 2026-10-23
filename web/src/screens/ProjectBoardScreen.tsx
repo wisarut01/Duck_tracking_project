@@ -1,60 +1,60 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { errorMessage } from '@/api/client';
+import { useAppData } from '@/lib/appData';
 import { cn } from '@/lib/cn';
 import { issueTypeMeta } from '@/lib/issueMeta';
-import { ISSUE_TYPES, type Issue, type IssueType, type MoveIssueRequest, type Project } from '@/types/api';
+import {
+  ISSUE_TYPES,
+  type Comment,
+  type CreateIssueRequest,
+  type Issue,
+  type IssueType,
+  type MoveIssueRequest,
+  type PageSummary,
+  type Project,
+} from '@/types/api';
 import { AppShell } from '@/components/layout/AppShell';
 import { Avatar } from '@/components/ui/Avatar';
-import { ToastProvider, useToast } from '@/components/ui/Toast';
 import { CreateIssueModal } from '@/components/issues/CreateIssueModal';
-import { IssueDetailPanel } from '@/components/issues/IssueDetailPanel';
+import { IssueDetailPanel, type IssueActions } from '@/components/issues/IssueDetailPanel';
 import { IssueTypeIcon } from '@/components/issues/IssueTypeIcon';
 import { KanbanBoard } from '@/components/issues/KanbanBoard';
-import {
-  commentsTB12,
-  findIssueByKey,
-  linkedPagesTB12,
-  projects,
-  spaces,
-  userDuck,
-  users,
-} from '@/mocks/fixtures';
-import { searchFixtures } from '@/mocks/search';
 
 export interface ProjectBoardScreenProps {
   project: Project;
   issues: Issue[];
   loading?: boolean;
-  /** เปิด drawer ของ issue นี้ไว้ตั้งแต่แรก */
-  defaultOpenIssueKey?: string;
+  /** issue ที่เปิด drawer อยู่ (undefined = ปิด) */
+  openIssueKey?: string;
+  onOpenIssue?: (issueKey: string | undefined) => void;
+  /** comment / หน้าที่ลิงก์ของ issue ที่เปิดอยู่ */
+  openIssueDetails?: { comments: Comment[]; linkedPages: PageSummary[]; loadingComments?: boolean };
+  /** สิ่งที่ทำได้ใน drawer (แก้ field, comment, ยกเลิกลิงก์) */
+  issueActions?: IssueActions;
+  onMoveIssue?: (issueKey: string, move: MoveIssueRequest) => void;
+  /** สร้าง issue — throw เมื่อไม่สำเร็จ แล้ว modal จะโชว์ข้อความ error */
+  onCreateIssue?: (request: CreateIssueRequest) => Promise<unknown> | void;
 }
 
-/** คำนวณ position ใหม่แบบเดียวกับ server: ค่ากลางระหว่างการ์ดก่อน/หลัง */
-function computePosition(all: Issue[], move: MoveIssueRequest): number {
-  const after = all.find((issue) => issue.key === move.afterKey);
-  const before = all.find((issue) => issue.key === move.beforeKey);
-  if (after && before) return (after.position + before.position) / 2;
-  if (after) return after.position + 1024;
-  if (before) return before.position - 1024;
-  return 1024;
-}
-
-/** หน้า Board ของ project — ใช้ mock data + state ในหน้า (Phase 2 เปลี่ยนเป็น react-query) */
-export function ProjectBoardScreen(props: ProjectBoardScreenProps) {
-  // ToastProvider ต้องอยู่ "เหนือ" component ที่เรียก useToast() จึงแยกเป็น 2 ชั้น
-  return (
-    <ToastProvider>
-      <ProjectBoardContent {...props} />
-    </ToastProvider>
-  );
-}
-
-function ProjectBoardContent({ project, issues: initialIssues, loading = false, defaultOpenIssueKey }: ProjectBoardScreenProps) {
-  const toast = useToast();
-  const navigate = useNavigate();
-  const [issues, setIssues] = useState(initialIssues);
+/**
+ * หน้า Board ของ project — แสดงผลอย่างเดียว ข้อมูลมาจาก props และแจ้งการกระทำผ่าน callback
+ * (ตัวที่ดึงข้อมูลจาก API คือ src/pages/BoardPage.tsx)
+ */
+export function ProjectBoardScreen({
+  project,
+  issues,
+  loading = false,
+  openIssueKey,
+  onOpenIssue,
+  openIssueDetails,
+  issueActions,
+  onMoveIssue,
+  onCreateIssue,
+}: ProjectBoardScreenProps) {
+  const { users, currentUser, resolveIssue } = useAppData();
   const [createOpen, setCreateOpen] = useState(false);
-  const [openIssueKey, setOpenIssueKey] = useState<string | undefined>(defaultOpenIssueKey);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string>();
   // ตัวกรอง: assignee (id) และ type
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<IssueType | null>(null);
@@ -63,24 +63,28 @@ function ProjectBoardContent({ project, issues: initialIssues, loading = false, 
     (issue) => (!assigneeFilter || issue.assignee?.id === assigneeFilter) && (!typeFilter || issue.type === typeFilter),
   );
   const openIssue = issues.find((issue) => issue.key === openIssueKey);
+  // KanbanBoard เก็บลำดับการ์ดใน state ของตัวเอง → เปลี่ยน key เมื่อข้อมูลเปลี่ยนเพื่อให้เริ่มใหม่จาก props ล่าสุด
+  const boardKey = visibleIssues.map((issue) => `${issue.key}:${issue.status}:${issue.position}`).join(',');
 
-  function handleMove(issueKey: string, move: MoveIssueRequest) {
-    setIssues((current) =>
-      current.map((issue) =>
-        issue.key === issueKey ? { ...issue, status: move.status, position: computePosition(current, move) } : issue,
-      ),
-    );
-    toast({ tone: 'success', title: `ย้าย ${issueKey} แล้ว`, description: `POST /issues/${issueKey}/move → ${move.status}` });
+  async function handleCreate(request: CreateIssueRequest) {
+    setCreating(true);
+    setCreateError(undefined);
+    try {
+      await onCreateIssue?.(request);
+      setCreateOpen(false);
+    } catch (error) {
+      setCreateError(errorMessage(error));
+    } finally {
+      setCreating(false);
+    }
   }
 
   return (
     <AppShell
-      sidebar={{ projects, spaces, activeProjectKey: project.key, currentUser: userDuck }}
+      sidebar={{ activeProjectKey: project.key }}
       breadcrumbs={[{ label: project.name }, { label: 'Board' }]}
       onCreate={() => setCreateOpen(true)}
-      search={searchFixtures}
-      onSelectIssue={(issue) => setOpenIssueKey(issue.key)}
-      onSelectPage={(page) => navigate(`/spaces/${page.spaceKey}/pages/${page.id}`)}
+      onSelectIssue={(issue) => onOpenIssue?.(issue.key)}
       canvas
     >
       <div className="flex h-full">
@@ -134,13 +138,12 @@ function ProjectBoardContent({ project, issues: initialIssues, loading = false, 
             </div>
           </div>
 
-          {/* key เปลี่ยนเมื่อ filter/จำนวน issue เปลี่ยน → KanbanBoard สร้าง state ใหม่จาก issues ล่าสุด */}
           <KanbanBoard
-            key={`${assigneeFilter}-${typeFilter}-${issues.length}`}
+            key={boardKey}
             issues={visibleIssues}
             loading={loading}
-            onMoveIssue={handleMove}
-            onOpenIssue={setOpenIssueKey}
+            onMoveIssue={onMoveIssue}
+            onOpenIssue={onOpenIssue}
             onAddIssue={() => setCreateOpen(true)}
           />
         </div>
@@ -151,13 +154,14 @@ function ProjectBoardContent({ project, issues: initialIssues, loading = false, 
               key={openIssue.key}
               layout="panel"
               issue={openIssue}
-              comments={openIssue.key === 'TB-12' ? commentsTB12 : []}
-              linkedPages={openIssue.key === 'TB-12' ? linkedPagesTB12 : []}
+              comments={openIssueDetails?.comments ?? []}
+              linkedPages={openIssueDetails?.linkedPages ?? []}
+              loadingComments={openIssueDetails?.loadingComments}
               users={users}
-              currentUser={userDuck}
-              resolveIssue={findIssueByKey}
-              onClose={() => setOpenIssueKey(undefined)}
-              onAddComment={() => toast({ tone: 'success', title: 'เพิ่ม comment แล้ว' })}
+              currentUser={currentUser}
+              resolveIssue={resolveIssue}
+              onClose={() => onOpenIssue?.(undefined)}
+              {...issueActions}
             />
           </div>
         )}
@@ -168,30 +172,9 @@ function ProjectBoardContent({ project, issues: initialIssues, loading = false, 
         onClose={() => setCreateOpen(false)}
         projectKey={project.key}
         users={users}
-        onSubmit={(request) => {
-          const nextNumber = Math.max(...issues.map((issue) => Number(issue.key.split('-')[1]))) + 1;
-          const now = new Date().toISOString();
-          const created: Issue = {
-            id: crypto.randomUUID(),
-            key: `${project.key}-${nextNumber}`,
-            projectKey: project.key,
-            title: request.title,
-            type: request.type,
-            status: 'TODO',
-            priority: request.priority ?? 'MEDIUM',
-            assignee: users.find((user) => user.id === request.assigneeId) ?? null,
-            reporter: userDuck,
-            description: request.description ?? null,
-            labels: request.labels ?? [],
-            position: 0,
-            linkedPageCount: 0,
-            createdAt: now,
-            updatedAt: now,
-          };
-          setIssues((current) => [created, ...current]);
-          setCreateOpen(false);
-          toast({ tone: 'success', title: `สร้าง ${created.key} แล้ว`, description: created.title });
-        }}
+        submitting={creating}
+        serverError={createError}
+        onSubmit={handleCreate}
       />
     </AppShell>
   );

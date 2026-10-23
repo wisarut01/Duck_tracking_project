@@ -4,7 +4,6 @@ import { AppShell } from './AppShell';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { projects, spaces, userDuck } from '@/mocks/fixtures';
-import { searchFixtures } from '@/mocks/search';
 
 const meta = {
   title: 'Layout/AppShell',
@@ -13,7 +12,6 @@ const meta = {
     sidebar: { projects, spaces, activeProjectKey: 'TB', currentUser: userDuck, onLogout: fn() },
     breadcrumbs: [{ label: 'Tracking Board' }, { label: 'Board' }],
     onCreate: fn(),
-    search: searchFixtures,
     onSelectIssue: fn(),
     onSelectPage: fn(),
     canvas: true,

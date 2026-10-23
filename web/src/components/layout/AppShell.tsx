@@ -1,19 +1,21 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router';
+import { useAppData } from '@/lib/appData';
 import { cn } from '@/lib/cn';
 import { useTheme } from '@/lib/useTheme';
-import type { IssueSummary, PageSummary, SearchResult } from '@/types/api';
+import type { IssueSummary, PageSummary } from '@/types/api';
 import { CommandPalette } from '@/components/search/CommandPalette';
 import { Sidebar, type SidebarProps } from './Sidebar';
 import { TopBar, type TopBarProps } from './TopBar';
 
 export interface AppShellProps {
-  /** props ที่ส่งต่อให้ Sidebar ตรงๆ */
-  sidebar: SidebarProps;
+  /** props ของ Sidebar — projects, spaces, currentUser, onLogout มาจาก AppData ถ้าไม่ได้ส่งมา */
+  sidebar?: Partial<SidebarProps>;
   breadcrumbs?: TopBarProps['breadcrumbs'];
   onCreate?: () => void;
-  /** ฟังก์ชันค้นหา (Phase 2: แทนด้วย react-query เรียก GET /search) */
-  search?: (query: string) => SearchResult;
+  /** เลือก issue จาก ⌘K — ไม่ส่งมา = ไปหน้า /issues/{key} */
   onSelectIssue?: (issue: IssueSummary) => void;
+  /** เลือกหน้าจาก ⌘K — ไม่ส่งมา = ไปหน้า /spaces/{key}/pages/{id} */
   onSelectPage?: (page: PageSummary) => void;
   /** true = พื้นหลังแบบ dot-grid (ใช้กับ board), false = พื้นเรียบ (ใช้กับ docs) */
   canvas?: boolean;
@@ -25,13 +27,12 @@ export interface AppShellProps {
 
 /**
  * โครงหน้าหลักของแอป: Sidebar ซ้าย + TopBar บน + เนื้อหา
- * จัดการ ⌘K / Ctrl+K เปิดค้นหา และปุ่มสลับธีมให้เอง
+ * จัดการ ⌘K / Ctrl+K เปิดค้นหา (ผลค้นหามาจาก AppData) และปุ่มสลับธีมให้เอง
  */
 export function AppShell({
   sidebar,
   breadcrumbs,
   onCreate,
-  search,
   onSelectIssue,
   onSelectPage,
   canvas = false,
@@ -41,8 +42,11 @@ export function AppShell({
 }: AppShellProps) {
   const [searchOpen, setSearchOpen] = useState(defaultSearchOpen);
   const [query, setQuery] = useState(defaultSearchQuery);
-  const [collapsed, setCollapsed] = useState(sidebar.collapsed ?? false);
+  const [collapsed, setCollapsed] = useState(sidebar?.collapsed ?? false);
   const { isDark, toggle } = useTheme();
+  const navigate = useNavigate();
+  const { projects, spaces, currentUser, onLogout, useSearch } = useAppData();
+  const search = useSearch(searchOpen ? query : ''); // ค้นเฉพาะตอน palette เปิด
 
   // คีย์ลัด ⌘K / Ctrl+K เปิดค้นหาจากทุกที่
   useEffect(() => {
@@ -60,7 +64,7 @@ export function AppShell({
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-canvas text-ink">
-      <Sidebar {...sidebar} collapsed={collapsed} />
+      <Sidebar projects={projects} spaces={spaces} currentUser={currentUser} onLogout={onLogout} {...sidebar} collapsed={collapsed} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
           breadcrumbs={breadcrumbs}
@@ -78,13 +82,16 @@ export function AppShell({
         onClose={closeSearch}
         query={query}
         onQueryChange={setQuery}
-        results={search && query.trim() ? search(query) : null}
+        results={search.results}
+        loading={search.loading}
         onSelectIssue={(issue) => {
-          onSelectIssue?.(issue);
+          if (onSelectIssue) onSelectIssue(issue);
+          else navigate(`/issues/${issue.key}`);
           closeSearch();
         }}
         onSelectPage={(page) => {
-          onSelectPage?.(page);
+          if (onSelectPage) onSelectPage(page);
+          else navigate(`/spaces/${page.spaceKey}/pages/${page.id}`);
           closeSearch();
         }}
       />

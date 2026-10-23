@@ -53,6 +53,9 @@ export interface IssueDetailPanelProps {
   layout?: 'panel' | 'page';
 }
 
+/** สิ่งที่ผู้ใช้ทำได้กับ issue — drawer บน board และหน้า issue เต็มใช้ชุดเดียวกัน */
+export type IssueActions = Pick<IssueDetailPanelProps, 'onUpdate' | 'onStatusChange' | 'onAddComment' | 'onLinkPage' | 'onUnlinkPage'>;
+
 /**
  * รายละเอียด issue: หัวเรื่อง, field ต่างๆ, คำอธิบาย (Markdown), หน้า Docs ที่ลิงก์, comment
  * field เก็บใน local state เพื่อให้ลองเปลี่ยนใน Storybook ได้ และแจ้ง parent ผ่าน onUpdate

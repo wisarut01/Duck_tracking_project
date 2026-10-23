@@ -1,60 +1,41 @@
-import { useState } from 'react';
 import type { Comment, Issue, PageSummary } from '@/types/api';
+import { useAppData } from '@/lib/appData';
 import { AppShell } from '@/components/layout/AppShell';
-import { ToastProvider, useToast } from '@/components/ui/Toast';
-import { IssueDetailPanel } from '@/components/issues/IssueDetailPanel';
-import { findIssueByKey, projects, spaces, userDuck, users } from '@/mocks/fixtures';
-import { searchFixtures } from '@/mocks/search';
+import { IssueDetailPanel, type IssueActions } from '@/components/issues/IssueDetailPanel';
 
 export interface IssueDetailScreenProps {
   issue: Issue;
   comments: Comment[];
   linkedPages: PageSummary[];
   loadingComments?: boolean;
+  actions?: IssueActions;
 }
 
-/** หน้า /issues/TB-12 แบบเต็มหน้า */
-export function IssueDetailScreen(props: IssueDetailScreenProps) {
-  return (
-    <ToastProvider>
-      <IssueDetailContent {...props} />
-    </ToastProvider>
-  );
-}
-
-function IssueDetailContent({ issue, comments: initialComments, linkedPages: initialPages, loadingComments }: IssueDetailScreenProps) {
-  const toast = useToast();
-  const [comments, setComments] = useState(initialComments);
-  const [linkedPages, setLinkedPages] = useState(initialPages);
+/** หน้า /issues/TB-12 แบบเต็มหน้า (ตัวที่ดึงข้อมูลคือ src/pages/IssuePage.tsx) */
+export function IssueDetailScreen({ issue, comments, linkedPages, loadingComments, actions }: IssueDetailScreenProps) {
+  const { projects, users, currentUser, resolveIssue } = useAppData();
+  const project = projects.find((item) => item.key === issue.projectKey);
 
   return (
     <AppShell
-      sidebar={{ projects, spaces, activeProjectKey: issue.projectKey, currentUser: userDuck }}
-      breadcrumbs={[{ label: 'Tracking Board' }, { label: 'Issues' }, { label: issue.key }]}
-      search={searchFixtures}
+      sidebar={{ activeProjectKey: issue.projectKey }}
+      breadcrumbs={[
+        { label: project?.name ?? issue.projectKey, to: `/projects/${issue.projectKey}/board` },
+        { label: issue.key },
+      ]}
     >
       <div className="mx-auto max-w-6xl p-6">
         <IssueDetailPanel
+          // key รวม updatedAt → ข้อมูลจาก server เปลี่ยนเมื่อไหร่ panel เริ่มใหม่จากค่าล่าสุด
+          key={`${issue.key}-${issue.updatedAt}`}
           issue={issue}
           comments={comments}
           linkedPages={linkedPages}
           users={users}
-          currentUser={userDuck}
-          resolveIssue={findIssueByKey}
+          currentUser={currentUser}
+          resolveIssue={resolveIssue}
           loadingComments={loadingComments}
-          onUpdate={(changes) => toast({ tone: 'info', title: 'PATCH /issues/' + issue.key, description: JSON.stringify(changes) })}
-          onStatusChange={(status) => toast({ tone: 'success', title: `ย้าย ${issue.key} → ${status}` })}
-          onAddComment={(body) =>
-            setComments((current) => [
-              ...current,
-              { id: crypto.randomUUID(), issueKey: issue.key, author: userDuck, body, createdAt: new Date().toISOString() },
-            ])
-          }
-          onLinkPage={() => toast({ tone: 'info', title: 'เลือกหน้าที่จะลิงก์ (Phase 2)' })}
-          onUnlinkPage={(pageId) => {
-            setLinkedPages((current) => current.filter((page) => page.id !== pageId));
-            toast({ tone: 'success', title: 'ยกเลิกลิงก์แล้ว' });
-          }}
+          {...actions}
         />
       </div>
     </AppShell>

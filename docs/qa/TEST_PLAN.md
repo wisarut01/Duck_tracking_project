@@ -71,7 +71,7 @@ Test data: ทุก test สร้าง user / project / space ของตั
 ## 6. Conventions
 
 - ID: `TC-<AREA>-<NNN>`; Priority: **P0** = blocker/smoke, **P1** = core behavior, **P2** = edge / nice-to-have
-- Automation column: `API` = `e2e/api/<file>`, `UI-SB` = Storybook smoke `e2e/ui/storybook.spec.ts`, `FE-unit` = Vitest/Storybook play ใน `web/`, `E2E (P2)` = แผน Phase 2, `Manual`
+- Automation column: `API` = `e2e/api/<file>`, `UI-SB` = Storybook smoke `e2e/ui/storybook.spec.ts`, `FE-unit` = Vitest/Storybook play ใน `web/`, `E2E (P2)` = แผน Phase 2, `E2E (app/app.spec.ts)` = รันแล้วกับเว็บจริง, `Manual`
 - Playwright tag `@P0/@P1/@P2` ใน test title → รันเฉพาะ priority ได้: `npx playwright test --grep @P0`
 
 ## 7. Acceptance criteria & test cases
@@ -89,7 +89,7 @@ Test data: ทุก test สร้าง user / project / space ของตั
 | TC-AUTH-007 | P0 | **Given** ไม่ส่ง `Authorization` **When** เรียก endpoint ที่ต้อง auth (me, users, projects GET/POST, issues, move, spaces, search) **Then** 401 `UNAUTHENTICATED` ทุกตัว | API (9 cases) |
 | TC-AUTH-008 | P0 | **Given** token ปลอม / malformed **When** `GET /auth/me` **Then** 401 | API |
 | TC-AUTH-009 | P1 | **Given** login แล้ว **When** `GET /users` **Then** 200 `User[]` มีตัวเองอยู่ (ใช้เลือก assignee) | API |
-| TC-AUTH-010 | P0 | **Given** หน้า login **When** กรอกถูกแล้ว submit **Then** redirect ไป board และ token ถูกเก็บ; กรอกผิดเห็นข้อความ error | E2E (P2) |
+| TC-AUTH-010 | P0 | **Given** หน้า login **When** กรอกถูกแล้ว submit **Then** redirect ไป board และ token ถูกเก็บ; กรอกผิดเห็นข้อความ error | E2E (`app/app.spec.ts`) |
 | TC-AUTH-011 | P2 | **Given** token หมดอายุ (exp ผ่านแล้ว) **When** เรียก API **Then** 401 | Manual (ต้องควบคุมเวลา/secret) |
 
 ### 7.2 Projects (`e2e/api/projects.spec.ts`)
@@ -127,6 +127,7 @@ Test data: ทุก test สร้าง user / project / space ของตั
 | TC-ISSUE-017 | P1 | **Given** หน้า issue detail **When** แก้ title/assignee ในฟอร์ม **Then** board อัปเดตตาม | E2E (P2) |
 | TC-ISSUE-018 | P1 | **When** สร้างหรือ PATCH ด้วย title ที่มีแต่ช่องว่าง **Then** 400 `VALIDATION_FAILED` | API |
 | TC-ISSUE-019 | P2 | **When** title มีช่องว่างหน้า/หลัง **Then** เก็บแบบตัดช่องว่างแล้ว | API |
+| TC-ISSUE-021 | P1 | **Given** หน้า board **When** สร้าง issue จาก modal แล้วเปิด drawer เขียน comment **Then** เห็นการ์ดใหม่และ comment ทันที | E2E (`app/app.spec.ts`) |
 | TC-ISSUE-020 | P1 | **When** list โดยไม่ filter **Then** เรียงตามคอลัมน์ (TODO → DONE) แล้วตาม `position` น้อย→มาก (ตาม spec) | API |
 
 ### 7.4 Board move — drag & drop + ordering (`e2e/api/board.spec.ts`)
@@ -144,7 +145,7 @@ Test data: ทุก test สร้าง user / project / space ของตั
 | TC-BOARD-007 | P1 | **When** move issue ที่ไม่มี **Then** 404 | API |
 | TC-BOARD-008 | P2 | **When** `afterKey` เป็น issue ที่ไม่ได้อยู่ในคอลัมน์ปลายทาง **Then** 400/404 + Error body | API |
 | TC-BOARD-009 | P2 | **When** แทรกที่ช่องเดิม (หลัง A) 25 ครั้งติด **Then** ลำดับยังถูกต้อง ไม่มี position ชน | API |
-| TC-BOARD-010 | P0 | **Given** board 4 คอลัมน์ **When** ลากการ์ดด้วย mouse ข้ามคอลัมน์ **Then** การ์ดอยู่ตำแหน่งใหม่ทันที (optimistic) และหลัง reload ยังอยู่ | E2E (P2) |
+| TC-BOARD-010 | P0 | **Given** board 4 คอลัมน์ **When** ลากการ์ดด้วย mouse ข้ามคอลัมน์ **Then** การ์ดอยู่ตำแหน่งใหม่ทันที (optimistic) และหลัง reload ยังอยู่ | E2E (`app/app.spec.ts`) |
 | TC-BOARD-011 | P1 | **Given** API move ตอบ error **When** ลากการ์ด **Then** การ์ดเด้งกลับที่เดิม + แสดง toast | E2E (P2) / FE-unit (MSW) |
 | TC-BOARD-012 | P1 | **When** ใช้ keyboard (Space → ลูกศร → Space) ย้ายการ์ด **Then** ย้ายได้ + screen reader announce | Manual / E2E (P2) |
 | TC-BOARD-013 | P1 | **Given** story ของ Board/Card ใน Storybook **Then** render ทุก state ไม่มี error | UI-SB |
@@ -208,7 +209,7 @@ Test data: ทุก test สร้าง user / project / space ของตั
 | TC-MENTION-004 | P1 | **Given** `ATB-12`, `TB-12a`, `tb-12` **Then** ไม่แปลง (word boundary + uppercase เท่านั้น) | FE-unit |
 | TC-MENTION-005 | P2 | **Given** key ที่ไม่มีจริง (`TB-99999`) **Then** render ตามที่ตกลง (ลิงก์ + 404 page หรือ text ธรรมดา) — *ต้องตัดสินใจ* | FE-unit |
 | TC-MENTION-006 | P2 | **Given** mention ใน issue description / comment **Then** auto-link เหมือนกัน | FE-unit |
-| TC-MENTION-007 | P1 | **When** คลิก mention ในหน้า doc **Then** ไปหน้า issue นั้น | E2E (P2) |
+| TC-MENTION-007 | P1 | **When** คลิก mention ในหน้า doc **Then** ไปหน้า issue นั้น | E2E (`app/app.spec.ts`) |
 
 ### 7.9 Search (`e2e/api/search.spec.ts`)
 
@@ -222,7 +223,7 @@ Test data: ทุก test สร้าง user / project / space ของตั
 | TC-SEARCH-006 | P2 | **When** q = issue key **Then** เจอ issue นั้น | API |
 | TC-SEARCH-007 | P2 | **When** q ตัวพิมพ์ใหญ่ ส่วน contentMd มีตัวเล็ก **Then** เจอ (case-insensitive, ค้นใน content) | API |
 | TC-SEARCH-008 | P2 | **When** q ภาษาไทย **Then** เจอ issue/page ภาษาไทย | Manual → API (backlog) |
-| TC-SEARCH-009 | P1 | **When** พิมพ์ใน search box **Then** แสดงผลแยก Issues / Pages และคลิกไปได้ | E2E (P2) |
+| TC-SEARCH-009 | P1 | **When** พิมพ์ใน search box **Then** แสดงผลแยก Issues / Pages และคลิกไปได้ | E2E (`app/app.spec.ts`) |
 | TC-SEARCH-010 | P2 | **When** `q` มีแต่ช่องว่าง **Then** 400 `VALIDATION_FAILED` | API |
 
 ### 7.10 Error format & 401 handling (`e2e/api/errors.spec.ts` + ทุกไฟล์)
@@ -238,7 +239,7 @@ Test data: ทุก test สร้าง user / project / space ของตั
 | TC-ERR-005 | P1 | **When** JSON body พัง **Then** 400 (ไม่ใช่ 500) | API |
 | TC-ERR-006 | P2 | **When** path param ผิดรูป (`/issues/not-a-key`, `/pages/not-a-uuid`) **Then** 400/404 + Error body | API |
 | TC-ERR-007 | P1 | **Then** `error.code` อยู่ใน enum ที่ตกลงเสมอ | API |
-| TC-ERR-008 | P0 | **Given** FE login อยู่ **When** API ใดตอบ 401 **Then** ล้าง token, redirect ไป `/login?next=<path>` ครั้งเดียว (ไม่ loop), หลัง login กลับหน้าเดิม | E2E (P2) / FE-unit (MSW) |
+| TC-ERR-008 | P0 | **Given** FE login อยู่ **When** API ใดตอบ 401 **Then** ล้าง token, redirect ไป `/login?next=<path>` ครั้งเดียว (ไม่ loop), หลัง login กลับหน้าเดิม | E2E (`app/app.spec.ts`) |
 | TC-ERR-009 | P1 | **When** API ตอบ 500/network error **Then** FE แสดง error state ที่ retry ได้ ไม่ crash | UI-SB (error-state stories) / E2E (P2) |
 | TC-ERR-010 | P2 | **When** ใช้ method ที่ไม่มีใน spec (`PUT /projects`) **Then** 404 `NOT_FOUND` (ไม่ใช่ 405) | API |
 

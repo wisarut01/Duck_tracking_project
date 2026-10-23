@@ -1,6 +1,7 @@
 import type { Preview } from '@storybook/react-vite';
 import { withThemeByClassName } from '@storybook/addon-themes';
 import { MemoryRouter } from 'react-router';
+import { FixtureAppDataProvider } from '../src/mocks/FixtureAppDataProvider';
 import '../src/styles/index.css';
 
 const preview: Preview = {
@@ -27,9 +28,12 @@ const preview: Preview = {
       parentSelector: 'html',
     }),
     // component ที่ใช้ <Link> ต้องอยู่ใน Router — ใช้ MemoryRouter (ไม่เปลี่ยน URL ของ Storybook)
+    // AppData (เมนูซ้าย, ผู้ใช้, ค้นหา) มาจาก fixtures — ในแอปจริงมาจาก API
     (Story) => (
       <MemoryRouter>
-        <Story />
+        <FixtureAppDataProvider>
+          <Story />
+        </FixtureAppDataProvider>
       </MemoryRouter>
     ),
   ],

@@ -47,17 +47,18 @@ Log in with `duck@example.com` / `password123`. More details:
 
 ## Frontend
 
-Phase 1 covers the design system and a Storybook with every component and the main screens. Everything is in [`web/`](web/) and uses Vite, React, TypeScript (strict), Tailwind CSS v4 and Storybook 10. The design spec is [`web/DESIGN.md`](web/DESIGN.md) (in Thai).
+The web app logs in and reads/writes everything through the REST API (the mock on :4010 for now). Storybook shows every component and screen with fixture data. Everything is in [`web/`](web/) and uses Vite, React, TypeScript (strict), Tailwind CSS v4 and Storybook 10. The design spec is [`web/DESIGN.md`](web/DESIGN.md) (in Thai).
 
 ```bash
 cd web
 npm install
 npm run storybook        # Storybook on http://localhost:6006 (theme toggle on the toolbar, a11y tab)
-npm run dev              # app on http://localhost:5173 (screens wired to mock fixtures for now)
+npm run dev              # app on http://localhost:5173 → calls the mock API on :4010 (start it with `make mock`)
 npm run typecheck        # tsc --noEmit
 npm run build-storybook  # static Storybook in web/storybook-static
 ```
 
 - Types are generated from `api/openapi.yaml` into `web/src/types/openapi.gen.ts` (`npm run gen:api`, or `npm run check:api` to check it is up to date). `web/src/types/api.ts` gives them short names. Mock data is in `web/src/mocks/fixtures.ts` (project `TB`, space `ENG`).
-- `npm run dev:msw` runs the app with [MSW](https://mswjs.io) answering `/api/v1/*` in the browser from the fixtures (`web/src/mocks/handlers.ts`), so you don't need the mock API running.
-- Phase 2 replaces the fixtures with `@tanstack/react-query` calls to the mock API on :4010, then to the gateway on :8080.
+- Code layout: `src/api/` (typed client from `openapi-fetch` + react-query hooks), `src/pages/` (route components that fetch data), `src/screens/` + `src/components/` (UI only, props in / callbacks out, also used by Storybook).
+- `VITE_API_BASE_URL` picks the API (default `http://localhost:4010/api/v1`). Set it to `http://localhost:8080/api/v1` once the real gateway runs.
+- `npm run dev:msw` runs the app with [MSW](https://mswjs.io) answering `/api/v1/*` in the browser from the fixtures (`web/src/mocks/handlers.ts`), so you don't need the mock API running. It only covers reading data, login and moving cards.

@@ -1,11 +1,21 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { fn } from 'storybook/test';
 import { DocsPageScreen } from './DocsPageScreen';
 import { linkedIssuesBoardSpec, pageBoardSpec, pageTree, spaceENG } from '@/mocks/fixtures';
 
 const meta = {
   title: 'Screens/DocsPage',
   component: DocsPageScreen,
-  args: { space: spaceENG, tree: pageTree, page: pageBoardSpec, linkedIssues: linkedIssuesBoardSpec },
+  args: {
+    space: spaceENG,
+    tree: pageTree,
+    page: pageBoardSpec,
+    linkedIssues: linkedIssuesBoardSpec,
+    onSelectPage: fn(),
+    onCreatePage: fn(),
+    onSavePage: fn(),
+    onUnlinkIssue: fn(),
+  },
   parameters: { layout: 'fullscreen' },
 } satisfies Meta<typeof DocsPageScreen>;
 
@@ -16,3 +26,5 @@ type Story = StoryObj<typeof meta>;
 export const Reading: Story = {};
 export const Editing: Story = { args: { defaultEditing: true } };
 export const NoLinkedIssues: Story = { args: { linkedIssues: [] } };
+export const LoadingPage: Story = { args: { page: undefined, loadingPage: true } };
+export const EmptySpace: Story = { args: { page: undefined, tree: [] } };

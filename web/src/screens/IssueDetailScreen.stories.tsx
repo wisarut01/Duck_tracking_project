@@ -1,11 +1,17 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { fn } from 'storybook/test';
 import { IssueDetailScreen } from './IssueDetailScreen';
 import { commentsTB12, issues, issueTB12, linkedPagesTB12 } from '@/mocks/fixtures';
 
 const meta = {
   title: 'Screens/IssueDetail',
   component: IssueDetailScreen,
-  args: { issue: issueTB12, comments: commentsTB12, linkedPages: linkedPagesTB12 },
+  args: {
+    issue: issueTB12,
+    comments: commentsTB12,
+    linkedPages: linkedPagesTB12,
+    actions: { onUpdate: fn(), onStatusChange: fn(), onAddComment: fn(), onUnlinkPage: fn() },
+  },
   parameters: { layout: 'fullscreen' },
 } satisfies Meta<typeof IssueDetailScreen>;
 

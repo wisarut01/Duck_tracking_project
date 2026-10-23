@@ -25,6 +25,18 @@ export default defineConfig({
       },
     },
     {
+      // the real web app (WEB_URL) + API. baseURL is the API so the data builders in lib/fixtures.ts work.
+      name: 'app',
+      testDir: './app',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1600, height: 1000 },
+        baseURL: API_BASE_URL,
+        trace: 'retain-on-failure',
+        screenshot: 'only-on-failure',
+      },
+    },
+    {
       name: 'ui',
       testDir: './ui',
       timeout: 10 * 60_000, // one test walks every story

@@ -10,8 +10,11 @@
 | Phase 1 — FE / BE / QA (ทำพร้อมกัน, ใช้ mock) | ✅ เสร็จ |
 | รันทั้งระบบด้วย `make up` (docker compose) | ✅ เสร็จ (2026-10-23) |
 | ตัดสินใจเรื่อง spec 6 ข้อ (ดูหัวข้อ "ข้อที่ตัดสินใจแล้ว") | ✅ เสร็จ (2026-10-23) |
-| Phase 2 — Service จริง (Go/Python + gRPC) + FE ต่อ API | ⬜ ยังไม่เริ่ม |
-| ส่วนที่ 2 — บทเรียน FE / BE | ⬜ ยังไม่เริ่ม |
+| Phase 2a — หน้าเว็บดึง/บันทึกข้อมูลผ่าน API (ตอนนี้ต่อ mock :4010) | ✅ เสร็จ (2026-10-23) |
+| Phase 2b — Service จริง: gateway (Go Fiber) + auth / tracker (Go) + docs (Python) + Postgres | ⬜ ยังไม่เริ่ม |
+| Phase 2c — สลับเว็บและ test ไปใช้ gateway จริง (:8080), E2E ผ่าน → **MVP พร้อมใช้** | ⬜ ยังไม่เริ่ม |
+| ส่วนที่ 2 — บทเรียน FE / BE (สอนจากโค้ด MVP ที่เสร็จแล้ว) | ⬜ หลัง MVP |
+| Phase 3 (เสนอ ยังไม่ได้ตกลง) — พร้อมใช้จริงบน server: CI, deploy, HTTPS, backup, monitoring | ⬜ ยังไม่ได้วางแผน |
 
 ## Phase 0 — Contract
 
@@ -32,8 +35,14 @@
   - `build` และ `build-storybook` ผ่าน
   - เปิดทุก story ได้ครบ 207 รายการ
   - ตรวจ contrast ผ่านแล้ว
+- **Phase 2a (2026-10-23):** หน้าเว็บต่อ API แล้วทุกหน้า
+  - login / register / logout, token หมดอายุ (401) → กลับหน้า login แล้วกลับมาหน้าเดิม
+  - board: โหลด issue, ลากการ์ด (optimistic + ย้อนกลับถ้า error), สร้าง issue, drawer แก้ field / comment / ยกเลิกลิงก์
+  - หน้า issue, หน้า docs (page tree, อ่าน, แก้ไข, สร้างหน้าใหม่, ยกเลิกลิงก์), ค้นหา (⌘K และ /search)
+  - โครง: `src/api/` (client จาก spec + react-query hooks) → `src/pages/` (ดึงข้อมูล) → `src/screens/` (UI อย่างเดียว ใช้ใน Storybook ด้วย fixtures)
 - **ยังไม่ทำ:**
-  - ยังไม่ต่อ API จริง (หน้าจอใช้ข้อมูลตัวอย่าง)
+  - ปุ่ม "Link" issue ↔ page ยังไม่มีหน้าเลือก (API มีแล้ว) — ตอนนี้ยกเลิกลิงก์ได้อย่างเดียว
+  - ปุ่มสร้าง project / space ใน sidebar ยังไม่มีฟอร์ม
   - ยังไม่มี ESLint และ unit test
 
 ### Backend — `services/mock-api/`, `proto/`
@@ -58,6 +67,7 @@
 - **ผลทดสอบ:**
   - API ผ่าน 98/98
   - UI ผ่าน 2/2 รันกับ Storybook build ของ FE
+- **Phase 2a:** เพิ่ม project `app` (`e2e/app/app.spec.ts`) — E2E ผ่านเว็บจริง 6 ข้อ: login, 401 redirect, drag & drop, สร้าง issue + comment, mention ในหน้า doc, ค้นหา
 - **ข้อควรรู้:** ถ้ารัน test ใน CI ต้องใช้ mock แยกของตัวเอง เพราะถ้ามีคน reset mock ที่ใช้ร่วมกันกลางทาง test จะตกแบบสุ่ม
 
 ## วิธีรัน
@@ -107,7 +117,12 @@ Login ทดสอบ: `duck@example.com` / `password123`
 
 ## ขั้นต่อไป
 
-1. ส่วนที่ 2: ออกแบบบทเรียน
-   - **FE:** React + TS + Tailwind อิงจาก component ที่ทำไว้แล้ว
-   - **BE:** Go Fiber gateway, gRPC microservice (Go + GORM) และ Python docs-service อิงจาก proto ที่ทำไว้แล้ว
-2. Phase 2: ทำ service จริงตาม proto แล้วสลับ FE และ QA จาก mock (`:4010`) ไปใช้ gateway จริง (`:8080`)
+1. **Phase 2b** — ทำ service จริงตาม `proto/`
+   - api-gateway (Go Fiber): REST ตาม `api/openapi.yaml` → เรียก gRPC, ตรวจ JWT, แปลง error ตาม AGREEMENTS
+   - auth-service, tracker-service (Go + GORM), docs-service (Python grpcio + SQLAlchemy)
+   - Postgres ใน compose: 1 database ต่อ service
+2. **Phase 2c** — ตั้ง `VITE_API_BASE_URL` / `API_BASE_URL` ไปที่ gateway (:8080), รัน API + E2E test ชุดเดิมให้ผ่าน → **MVP พร้อมใช้**
+3. **ส่วนที่ 2 — บทเรียน** (หลัง MVP)
+   - **FE:** React + TS + Tailwind + react-query อิงจากโค้ดใน `web/`
+   - **BE:** Go Fiber gateway, gRPC microservice (Go + GORM) และ Python docs-service อิงจากโค้ด Phase 2b
+4. **Phase 3** (ถ้าจะเปิดให้คนอื่นใช้จริง) — ตกลง scope กันก่อน: CI (GitHub Actions), deploy, HTTPS, เก็บ secret, backup DB, log/monitoring

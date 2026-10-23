@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FileText, Search } from 'lucide-react';
 import { Link } from 'react-router';
+import { useAppData } from '@/lib/appData';
 import { formatDate } from '@/lib/format';
 import type { SearchResult } from '@/types/api';
 import { AppShell } from '@/components/layout/AppShell';
@@ -13,12 +14,12 @@ import { IssueTypeIcon } from '@/components/issues/IssueTypeIcon';
 import { PriorityIcon } from '@/components/issues/PriorityIcon';
 import { StatusPill } from '@/components/issues/StatusPill';
 import { Highlight } from '@/components/search/Highlight';
-import { projects, spaces, userDuck } from '@/mocks/fixtures';
-import { searchFixtures } from '@/mocks/search';
 
 export interface SearchResultsScreenProps {
   defaultQuery: string;
-  /** ถ้าส่งมา จะใช้ผลนี้ตายตัว (ไม่ค้นใหม่ตอนพิมพ์) */
+  /** แจ้งเมื่อคำค้นเปลี่ยน (หน้าแอปใช้เก็บลง URL ?q=) */
+  onQueryChange?: (query: string) => void;
+  /** ถ้าส่งมา จะใช้ผลนี้ตายตัว (ไม่ค้นใหม่ตอนพิมพ์) — ไม่ส่ง = ค้นผ่าน AppData */
   results?: SearchResult;
   loading?: boolean;
   /** เปิด command palette ทับไว้ด้วย */
@@ -28,10 +29,18 @@ export interface SearchResultsScreenProps {
 type Tab = 'all' | 'issues' | 'pages';
 
 /** หน้า /search?q= — ผลลัพธ์เต็มหน้า แบ่งกลุ่ม Issues / Pages */
-export function SearchResultsScreen({ defaultQuery, results: fixedResults, loading = false, paletteOpen = false }: SearchResultsScreenProps) {
+export function SearchResultsScreen({
+  defaultQuery,
+  onQueryChange,
+  results: fixedResults,
+  loading: fixedLoading,
+  paletteOpen = false,
+}: SearchResultsScreenProps) {
   const [query, setQuery] = useState(defaultQuery);
   const [tab, setTab] = useState<Tab>('all');
-  const results = fixedResults ?? searchFixtures(query);
+  const search = useAppData().useSearch(query);
+  const results = fixedResults ?? search.results ?? { issues: [], pages: [] };
+  const loading = fixedLoading ?? search.loading;
   const total = results.issues.length + results.pages.length;
 
   const tabs: { value: Tab; label: string; count: number }[] = [
@@ -42,9 +51,7 @@ export function SearchResultsScreen({ defaultQuery, results: fixedResults, loadi
 
   return (
     <AppShell
-      sidebar={{ projects, spaces, currentUser: userDuck }}
       breadcrumbs={[{ label: 'Search' }]}
-      search={searchFixtures}
       defaultSearchOpen={paletteOpen}
       defaultSearchQuery={defaultQuery}
     >
@@ -54,7 +61,10 @@ export function SearchResultsScreen({ defaultQuery, results: fixedResults, loadi
           aria-label="คำค้นหา"
           leftIcon={<Search size={16} />}
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            onQueryChange?.(event.target.value);
+          }}
           placeholder="ค้นหา…"
         />
 
@@ -83,6 +93,8 @@ export function SearchResultsScreen({ defaultQuery, results: fixedResults, loadi
               <Skeleton key={n} className="h-14 rounded-xl" />
             ))}
           </div>
+        ) : !query.trim() ? (
+          <EmptyState icon={Search} title="พิมพ์คำที่ต้องการค้นหา" description="ค้นได้ทั้ง issue (key หรือ title) และหน้า Docs" />
         ) : total === 0 ? (
           <EmptyState icon={Search} title={`ไม่พบ “${query}”`} description="ลองคำอื่น หรือค้นด้วย issue key เช่น TB-12" />
         ) : (
