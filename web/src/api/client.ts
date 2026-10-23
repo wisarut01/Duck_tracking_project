@@ -8,10 +8,10 @@ import { getToken, setToken } from './token';
  * เช่น api.GET('/issues/{issueKey}', { params: { path: { issueKey } } })
  * → TS รู้เองว่า path นี้มีจริง, params ต้องมีอะไร และ data เป็น Issue
  *
- * ค่า default ชี้ไปที่ mock API (:4010) — Phase 2 ตอนมี gateway จริงให้ตั้ง
- * VITE_API_BASE_URL=http://localhost:8080/api/v1
+ * ค่า default ชี้ไปที่ gateway จริง (:8080) — ถ้าจะใช้ mock API ให้ตั้ง
+ * VITE_API_BASE_URL=http://localhost:4010/api/v1 (หรือ `make up-mock`)
  */
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4010/api/v1';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 
 export const api = createClient<paths>({ baseUrl: API_BASE_URL });
 

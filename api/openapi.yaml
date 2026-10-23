@@ -14,10 +14,10 @@ info:
     - ข้อความที่บังคับกรอก (title, name, displayName, comment body, คำค้น `q`) ต้องมีตัวอักษรอย่างน้อย 1 ตัวที่ไม่ใช่ช่องว่าง
       (`pattern: '\S'`) ไม่งั้นได้ `400 VALIDATION_FAILED`; server ตัดช่องว่างหน้า/หลังออกก่อนบันทึก
 servers:
-  - url: http://localhost:4010/api/v1
-    description: Mock (Prism)
   - url: http://localhost:8080/api/v1
     description: Gateway จริง
+  - url: http://localhost:4010/api/v1
+    description: Mock
 security:
   - bearerAuth: []
 tags:

@@ -12,7 +12,7 @@
 | ตัดสินใจเรื่อง spec 6 ข้อ (ดูหัวข้อ "ข้อที่ตัดสินใจแล้ว") | ✅ เสร็จ (2026-10-23) |
 | Phase 2a — หน้าเว็บดึง/บันทึกข้อมูลผ่าน API (ตอนนี้ต่อ mock :4010) | ✅ เสร็จ (2026-10-23) |
 | Phase 2b — Service จริง: gateway (Go Fiber) + auth / tracker (Go) + docs (Python) + Postgres | ✅ เสร็จ (2026-10-23) |
-| Phase 2c — สลับเว็บและ test ไปใช้ gateway จริง (:8080), E2E ผ่าน → **MVP พร้อมใช้** | ⬜ ยังไม่เริ่ม |
+| Phase 2c — สลับเว็บและ test ไปใช้ gateway จริง (:8080), E2E ผ่าน → **MVP พร้อมใช้** | ✅ เสร็จ (2026-10-23) — **MVP พร้อมใช้** |
 | ส่วนที่ 2 — บทเรียน FE / BE (สอนจากโค้ด MVP ที่เสร็จแล้ว) | ⬜ หลัง MVP |
 | Phase 3 (เสนอ ยังไม่ได้ตกลง) — พร้อมใช้จริงบน server: CI, deploy, HTTPS, backup, monitoring | ⬜ ยังไม่ได้วางแผน |
 
@@ -87,7 +87,7 @@
   - `docs-service` (Python 3.13 + grpcio + SQLAlchemy 2): space / page tree, ลบหน้าแล้วลบหน้าลูกทั้งหมดด้วย
   - Postgres 17: 1 instance, 1 database ต่อ service (`deploy/postgres/init.sql`)
   - `SEED_DEMO_DATA=true` ใส่ข้อมูลตัวอย่างชุดเดียวกับ mock (id เดียวกัน) ตอนตารางยังว่าง
-  - `make up-real`, `make test-real`, `make gen`, `make test-go`, `make test-docs`; รายละเอียดอยู่ที่ `services/README.md`
+  - `make gen`, `make test-go`, `make test-docs`; รายละเอียดอยู่ที่ `services/README.md`
 - **ผลทดสอบ (2026-10-23):**
   - Go: `go vet` ผ่าน, unit test ผ่านทั้ง gateway (ใช้ gRPC service ปลอม), auth และ tracker (กับ Postgres จริง)
   - docs-service: pytest 9/9 (SQLite ใน memory), `ruff` ผ่าน
@@ -101,30 +101,35 @@
   - `make smoke` กับ gateway จริงไม่ reset ข้อมูล (`/__mock/reset` มีแค่ใน mock) เลยมี TB-13 ค้างอยู่ใน DB
   - E2E หน้าเว็บต้องเปิดเว็บที่ origin ที่อยู่ใน `CORS_ORIGINS` ของ gateway (ค่าเริ่มต้น :5173 / :6006 / :8081)
 
+### Phase 2c — ใช้ backend จริงเป็นค่าเริ่มต้น (2026-10-23)
+- **เปลี่ยน:**
+  - `make up` เปิดทั้งระบบ: Postgres + 3 service + gateway :8080 + Swagger UI + web + Storybook
+  - เว็บ (`VITE_API_BASE_URL`) และเทสต์ (`API_BASE_URL`) ชี้ไปที่ `http://localhost:8080/api/v1` เป็นค่าเริ่มต้น; ใน `api/openapi.yaml` ย้าย gateway ขึ้นเป็น server แรก (Swagger "Try it out")
+  - Makefile: `make up-api` (backend + Swagger), `make test` (Playwright ทั้งชุด), `make test-api`
+  - mock ยังเก็บไว้แต่ไม่เปิดเอง: `make mock` (Node) หรือ `make up-mock` (Docker, เว็บชี้ไป :4010) ใช้ตอนทำ FE โดยไม่อยากเปิด Docker ทั้งชุด หรือเอาไว้เทียบพฤติกรรมกับ gateway
+- **ผลทดสอบ (เริ่มจาก DB ว่าง → `make up` → `make test` โดยไม่ตั้ง env ใดๆ):** **118/118** (API 105, E2E หน้าเว็บ 11, Storybook 2)
+  - โหมด mock (`make up-mock`, `API_BASE_URL=…:4010`): API + E2E 116/116
+  - `web`: `check:api` และ `tsc` ผ่าน; `e2e`: `tsc` ผ่าน
+- **ข้อควรรู้:** สลับระหว่าง `make up` กับ `make up-mock` ให้ `make down` ก่อน ไม่งั้น container ของอีกโหมดจะค้างอยู่
+
 ## วิธีรัน
 
 รันทุกอย่างพร้อมกันด้วย Docker:
 
 ```bash
-make up      # Mock API :4010, Swagger UI :8081, Web :5173, Storybook :6006
-make down    # หยุดทั้งหมด
+make up      # Gateway :8080, Swagger UI :8081, Web :5173, Storybook :6006 (+ Postgres และ 3 service)
+make test    # Playwright ทั้งชุดกับระบบที่รันอยู่
+make down    # หยุดทั้งหมด (ข้อมูลใน Postgres ยังอยู่)
 ```
 
-Backend จริง (Postgres + 3 service + gateway :8080):
+อื่นๆ:
 
 ```bash
-make up-real   # Gateway → http://localhost:8080/api/v1
-make test-real # Playwright API ชุดเดิมกับ gateway จริง
-```
-
-หรือรันทีละตัวบนเครื่อง:
-
-```bash
-make mock                      # Mock API   → http://localhost:4010/api/v1
-make swagger                   # Swagger UI → http://localhost:8081
+make up-api                    # เฉพาะ backend + Swagger UI
+make test-go / make test-docs  # unit test ของ service
+make mock                      # Mock API → http://localhost:4010/api/v1 (Node, ไม่ใช้ Docker)
+make up-mock                   # mock + เว็บที่ชี้ไป mock (Docker)
 make smoke                     # ทดสอบ flow หลักกับ mock
-cd web && npm run storybook    # Storybook  → http://localhost:6006
-cd e2e && npm test             # Playwright ทั้งหมด
 ```
 
 Login ทดสอบ: `duck@example.com` / `password123`
@@ -155,9 +160,7 @@ Login ทดสอบ: `duck@example.com` / `password123`
 
 ## ขั้นต่อไป
 
-1. **Phase 2c** — ตั้ง `VITE_API_BASE_URL` / `API_BASE_URL` ไปที่ gateway (:8080) เป็นค่าเริ่มต้น และให้ `make up` เปิด backend จริงแทน mock
-   - test ชุดเดิมผ่านกับ gateway แล้ว (API 105/105, E2E 11/11) เหลือสลับ config, เอกสาร และตัดสินใจว่าจะเก็บ mock ไว้ใช้ตอนไหน → **MVP พร้อมใช้**
-2. **ส่วนที่ 2 — บทเรียน** (หลัง MVP)
+1. **ส่วนที่ 2 — บทเรียน** (MVP เสร็จแล้ว เริ่มได้เลย)
    - **FE:** React + TS + Tailwind + react-query อิงจากโค้ดใน `web/`
    - **BE:** Go Fiber gateway, gRPC microservice (Go + GORM) และ Python docs-service อิงจากโค้ด Phase 2b
-3. **Phase 3** (ถ้าจะเปิดให้คนอื่นใช้จริง) — ตกลง scope กันก่อน: CI (GitHub Actions), deploy, HTTPS, เก็บ secret, backup DB, log/monitoring
+2. **Phase 3** (ถ้าจะเปิดให้คนอื่นใช้จริง) — ตกลง scope กันก่อน: CI (GitHub Actions), deploy, HTTPS, เก็บ secret, backup DB, log/monitoring

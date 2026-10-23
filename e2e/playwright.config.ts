@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
-/** Gateway / mock base URL. Always normalised to end with "/" so relative paths keep the /api/v1 prefix. */
-const API_BASE_URL = (process.env.API_BASE_URL ?? 'http://localhost:4010/api/v1').replace(/\/+$/, '') + '/';
+/** Gateway (default) or mock base URL. Always normalised to end with "/" so relative paths keep the /api/v1 prefix. */
+const API_BASE_URL = (process.env.API_BASE_URL ?? 'http://localhost:8080/api/v1').replace(/\/+$/, '') + '/';
 const STORYBOOK_URL = (process.env.STORYBOOK_URL ?? 'http://localhost:6006').replace(/\/+$/, '');
 
 export default defineConfig({

@@ -1,7 +1,7 @@
 # Backend services (Phase 2b)
 
-The real backend behind [`api/openapi.yaml`](../api/openapi.yaml). It replaces `mock-api`; the
-REST API is the same, so the web app and the Playwright suite work against either one.
+The real backend behind [`api/openapi.yaml`](../api/openapi.yaml). It replaced `mock-api` as the
+default (Phase 2c); the REST API is the same, so the web app and the Playwright suite work against either one.
 
 ```
 web ──REST :8080──> api-gateway (Go, Fiber v3) ──gRPC :50051──> auth-service    (Go + GORM)    → auth_db
@@ -16,17 +16,16 @@ The gRPC contracts, and which REST endpoint calls which RPC, are in [`proto/READ
 ## Run
 
 ```bash
-make up-real     # build + start postgres, the 3 services and the gateway (Docker)
-make test-real   # Playwright API suite against http://localhost:8080/api/v1
+make up-api      # build + start postgres, the 3 services, the gateway and Swagger UI (Docker)
+make up          # the same + web :5173 + Storybook :6006
+make test-api    # Playwright API suite against http://localhost:8080/api/v1
 make down        # stop (the postgres volume, i.e. your data, is kept)
 ```
 
 Log in with `duck@example.com` / `password123`. With `SEED_DEMO_DATA=true` (set in
 `docker-compose.yml`) every service adds the same demo data as the mock when its tables are empty:
 users duck/mint/ploy, project `TB` (TB-1…TB-12), spaces `ENG` and `PM`, with the same ids.
-To start over with only the demo data: `docker compose --profile real down -v && make up-real`.
-
-To point the web app at the real backend: `VITE_API_BASE_URL=http://localhost:8080/api/v1 npm run dev` in `web/`.
+To start over with only the demo data: `make down && docker volume rm tracking_board_pgdata && make up`.
 
 ## Code map
 
@@ -81,7 +80,7 @@ make test-docs   # ruff + pytest for docs-service in Docker (SQLite in memory, n
 ```
 
 The Go DB tests (auth-service, tracker-service) are skipped unless `TEST_DATABASE_URL` points at a
-Postgres. With `make up-real` running:
+Postgres. With `make up` (or `make up-api`) running:
 
 ```bash
 TEST_DATABASE_URL='postgres://tb:tb@localhost:5432/tb?sslmode=disable' make test-go

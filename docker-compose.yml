@@ -1,12 +1,15 @@
 # Local dev stack.
-#   make up       → mock-api :4010, Swagger UI :8081, web :5173, Storybook :6006
-#   make up-real  → the real backend: postgres :5432, auth/tracker/docs services (gRPC
-#                   :50051-50053) and api-gateway :8080. It is behind the "real" profile,
-#                   so a plain `docker compose up` doesn't start it.
-#   make down     → stop everything
+#   make up       → everything: postgres :5432, auth/tracker/docs services (gRPC :50051-50053),
+#                   api-gateway :8080, Swagger UI :8081, web :5173, Storybook :6006
+#   make up-api   → only the backend (postgres, services, gateway) + Swagger UI
+#   make up-mock  → the old Phase 1 setup: mock-api :4010 instead of the real backend,
+#                   web pointed at it. mock-api is behind the "mock" profile.
+#   make down     → stop everything (the postgres volume, i.e. the data, is kept)
 
 services:
+  # --- mock backend (Phase 1), only with `--profile mock` ---
   mock-api:
+    profiles: ["mock"]
     build: ./services/mock-api
     ports:
       - "4010:4010"
@@ -27,10 +30,8 @@ services:
     volumes:
       - ./api:/spec:ro
     environment:
-      SWAGGER_JSON: /spec/openapi.yaml   # "Try it out" uses the spec's servers list (mock :4010 first)
+      SWAGGER_JSON: /spec/openapi.yaml   # "Try it out" uses the spec's servers list (gateway :8080 first)
       PERSIST_AUTHORIZATION: "true"      # keep the Bearer token after a page reload
-    depends_on:
-      - mock-api
 
   # --- frontend (dev servers, hot reload from ./web) ---
   web:
@@ -46,6 +47,8 @@ services:
       - web_node_modules:/app/node_modules
     environment:
       CHOKIDAR_USEPOLLING: "true"    # file watching through the bind mount
+      # The browser calls this, so it's a host URL. `make up-mock` sets it to the mock (:4010).
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api/v1}
 
   storybook:
     build:                           # same image as `web` (the 2nd build is a cache hit)
@@ -59,9 +62,8 @@ services:
       - web_node_modules:/app/node_modules
     command: ["npx", "storybook", "dev", "-p", "6006", "--host", "0.0.0.0", "--ci"]
 
-  # --- real backend (Phase 2b): one Postgres instance, one database per service ---
+  # --- real backend: one Postgres instance, one database per service ---
   postgres:
-    profiles: ["real"]
     image: postgres:17-alpine
     ports:
       - "5432:5432"
@@ -79,7 +81,6 @@ services:
       retries: 10
 
   auth-service:
-    profiles: ["real"]
     build: { context: ., dockerfile: services/go.Dockerfile, args: { SERVICE: auth-service } }
     ports:
       - "50051:50051"
@@ -91,7 +92,6 @@ services:
       postgres: { condition: service_healthy }
 
   tracker-service:
-    profiles: ["real"]
     build: { context: ., dockerfile: services/go.Dockerfile, args: { SERVICE: tracker-service } }
     ports:
       - "50052:50052"
@@ -102,7 +102,6 @@ services:
       postgres: { condition: service_healthy }
 
   docs-service:
-    profiles: ["real"]
     build: { context: ., dockerfile: services/docs-service/Dockerfile }
     ports:
       - "50053:50053"
@@ -113,7 +112,6 @@ services:
       postgres: { condition: service_healthy }
 
   api-gateway:
-    profiles: ["real"]
     build: { context: ., dockerfile: services/go.Dockerfile, args: { SERVICE: api-gateway } }
     ports:
       - "8080:8080"

@@ -20,7 +20,9 @@ npm start        # http://localhost:4010
 npm run dev      # same, restarts when you edit a file (node --watch)
 npm run smoke    # in a 2nd terminal: login → list → create → move → link → search
 ```
-You can also use `make mock` / `make up` from the repo root.
+You can also use `make mock` / `make up-mock` from the repo root. Since Phase 2c the web app
+and the tests default to the real gateway (:8080); point them here with
+`VITE_API_BASE_URL` / `API_BASE_URL=http://localhost:4010/api/v1`.
 
 | Env var | Default | What it does |
 |---|---|---|

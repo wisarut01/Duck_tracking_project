@@ -33,9 +33,9 @@ load/performance test แบบเต็ม (ทำแค่ smoke ด้าน 
 
 | Env | URL | ใช้กับ | หมายเหตุ |
 |---|---|---|---|
-| Mock API | `http://localhost:4010/api/v1` | API tests Phase 1, FE dev | `services/mock-api` (stateful in-memory, reset ได้ด้วย `POST /__mock/reset`) |
+| Mock API | `http://localhost:4010/api/v1` | API tests Phase 1, เทียบพฤติกรรมกับ gateway (`API_BASE_URL=…`) | `services/mock-api` (stateful in-memory, reset ได้ด้วย `POST /__mock/reset`) |
 | Storybook | `http://localhost:6006` | component smoke | `web/` |
-| Gateway จริง (local) | `http://localhost:8080/api/v1` | API tests Phase 2 | docker compose + Postgres |
+| Gateway จริง (local) | `http://localhost:8080/api/v1` | ค่าเริ่มต้นของ API tests และ E2E ตั้งแต่ Phase 2c | `make up` (docker compose + Postgres) |
 | Web (Vite) | `http://localhost:5173` | E2E Phase 2 | |
 | CI | GitHub Actions (เสนอ) | ทุก PR: contract offline + API vs mock; nightly: API vs gateway + E2E | |
 
