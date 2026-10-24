@@ -194,6 +194,7 @@ Login ทดสอบ: `duck@example.com` / `password123`
 - ให้ทุกบัญชี Google sign in ได้ ไม่ต้องคอยเพิ่มรายชื่อ → `ALLOWED_EMAILS=*` (ค่าเริ่มต้นใน `render.yaml`)
 - **ข้อควรรู้:** ใครเจอ URL ก็เห็น แก้ และลบข้อมูลได้ทั้งหมด เพราะยังไม่มีสิทธิ์ราย project
 - ถ้าจะจำกัดทีหลัง ใส่รายชื่ออีเมล หรือ `@domain` ใน Render ได้เลย ไม่ต้องแก้โค้ด
+- เพิ่ม login / สมัครด้วยอีเมล + รหัสผ่านผ่าน Supabase Auth คู่กับ Google (`965a17c`) ต้องเปิด Email provider + Confirm email และตั้ง SMTP ใน Supabase (ดู `deploy/README.md` ข้อ 1)
 
 ### ความคืบหน้า Phase 3
 
