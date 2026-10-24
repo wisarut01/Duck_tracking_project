@@ -122,6 +122,7 @@ Render → `duck-tracking-api` → **Environment** → เปลี่ยน `AL
 
 | อาการ | สาเหตุ / ทางแก้ |
 |---|---|
+| เปิดเว็บแล้วเจอหน้า login ของ Vercel | เปิด URL ของ deployment (มี hash หรือ `-git-`) แทน `duck-tracking.vercel.app` หรือ Vercel → Settings → **Deployment Protection** → ปิด **Vercel Authentication** |
 | เปิดเว็บแล้วโหลดนาน หรือขึ้น error ครั้งแรก | Render กำลังตื่น รอ ~1 นาทีแล้ว reload |
 | login Google แล้วเด้งไป `localhost` | Site URL / Redirect URLs ใน Supabase ยังไม่ใช่ URL ของ Vercel |
 | "… is not allowed to use this app" | ตั้ง `ALLOWED_EMAILS` เป็นรายชื่อไว้ และอีเมลนั้นไม่อยู่ในรายชื่อ |
