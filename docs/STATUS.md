@@ -13,7 +13,7 @@
 | Phase 2a — หน้าเว็บดึง/บันทึกข้อมูลผ่าน API (ตอนนี้ต่อ mock :4010) | ✅ เสร็จ (2026-10-23) |
 | Phase 2b — Service จริง: gateway (Go Fiber) + auth / tracker (Go) + docs (Python) + Postgres | ✅ เสร็จ (2026-10-23) |
 | Phase 2c — สลับเว็บและ test ไปใช้ gateway จริง (:8080), E2E ผ่าน → **MVP พร้อมใช้** | ✅ เสร็จ (2026-10-23) — **MVP พร้อมใช้** |
-| ส่วนที่ 2 — บทเรียน FE / BE (สอนจากโค้ด MVP ที่เสร็จแล้ว) | ⬜ หลัง MVP |
+| ส่วนที่ 2 — บทเรียน FE / BE (สอนจากโค้ด MVP ที่เสร็จแล้ว) | 🟡 วางแผนแล้ว: 19 task ใน 14 วัน ดู `docs/LEARNING_PLAN.md` |
 | Phase 3 — deploy ใช้เองจากที่ไหนก็ได้: Vercel + Render + Supabase, login ด้วย Gmail (แผนด้านล่าง) | 🟡 กำลังทำ (เริ่ม 2026-10-23) |
 
 ## Phase 0 — Contract
