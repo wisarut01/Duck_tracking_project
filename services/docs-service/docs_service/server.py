@@ -66,6 +66,14 @@ def sqlalchemy_url(url: str) -> str:
     return url
 
 
+def login_rejected(message: str) -> bool:
+    """Wrong user/password, or Supabase's pooler already blocking us for that."""
+    return any(
+        marker in message
+        for marker in ("password authentication failed", "ECIRCUITBREAKER", "Tenant or user not found")
+    )
+
+
 def connect(url: str, schema: str = "") -> Engine:
     """Create the engine, waiting for Postgres (in Docker it may start after us).
 
@@ -82,14 +90,21 @@ def connect(url: str, schema: str = "") -> Engine:
                 cur.execute(f"SET search_path TO {name}")
             dbapi_connection.commit()
 
-    for _ in range(30):
+    # Retry for about a minute (1s, 2s, 4s, … up to 10s apart), but never on a
+    # wrong password: Supabase's pooler blocks everyone after too many of those.
+    delay, deadline = 1.0, time.monotonic() + 60
+    while time.monotonic() < deadline:
         try:
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
             return engine
         except OperationalError as err:
-            log.info("database not ready (%s), retrying…", err.orig)
-            time.sleep(1)
+            if login_rejected(str(err.orig)):
+                hint = "check the user and password in DATABASE_URL (not retrying)"
+                raise SystemExit(f"database rejected the login — {hint}: {err.orig}") from None
+            log.info("database not ready (%s), retrying in %.0fs…", err.orig, delay)
+            time.sleep(delay)
+            delay = min(delay * 2, 10)
     raise SystemExit("could not connect to the database")
 
 

@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -32,8 +33,10 @@ func Env(key, def string) string {
 	return def
 }
 
-// OpenDB connects to Postgres. It retries for a while because in Docker the
-// service often starts before Postgres is ready.
+// OpenDB connects to Postgres. It retries for about a minute (1s, 2s, 4s, …
+// up to 10s apart) because in Docker the service often starts before Postgres
+// is ready. A wrong password is NOT retried: Supabase's pooler blocks
+// everyone for a while after too many failed logins.
 //
 // schema "" = use the database as is (one database per service, docker compose).
 // Otherwise the service's tables live in that schema, which is created if
@@ -45,7 +48,8 @@ func OpenDB(dsn, schema string) (*gorm.DB, error) {
 		return nil, fmt.Errorf("parse DATABASE_URL: %w", err)
 	}
 	var lastErr error
-	for attempt := 0; attempt < 30; attempt++ {
+	delay := time.Second
+	for deadline := time.Now().Add(time.Minute); time.Now().Before(deadline); {
 		sqlDB := stdlib.OpenDB(*config, stdlib.OptionAfterConnect(func(ctx context.Context, conn *pgx.Conn) error {
 			return useSchema(ctx, conn, schema)
 		}))
@@ -61,11 +65,28 @@ func OpenDB(dsn, schema string) (*gorm.DB, error) {
 			}
 		}
 		sqlDB.Close()
+		if isLoginRejected(err) {
+			return nil, fmt.Errorf("database rejected the login — check the user and password in DATABASE_URL (not retrying): %w", err)
+		}
 		lastErr = err
-		log.Printf("database not ready (%v), retrying…", err)
-		time.Sleep(time.Second)
+		log.Printf("database not ready (%v), retrying in %s…", err, delay)
+		time.Sleep(delay)
+		delay = min(delay*2, 10*time.Second)
 	}
 	return nil, fmt.Errorf("connect to database: %w", lastErr)
+}
+
+// isLoginRejected: wrong user/password, or Supabase's pooler already blocking
+// us for too many of those. Retrying only makes the block last longer.
+func isLoginRejected(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && (pgErr.Code == "28P01" || pgErr.Code == "28000") {
+		return true
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "password authentication failed") ||
+		strings.Contains(msg, "ECIRCUITBREAKER") ||
+		strings.Contains(msg, "Tenant or user not found")
 }
 
 // useSchema runs on every new connection: create the schema and make it the

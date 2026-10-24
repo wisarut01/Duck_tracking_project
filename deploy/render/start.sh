@@ -15,5 +15,8 @@ AUTH_ADDR=127.0.0.1:50051 TRACKER_ADDR=127.0.0.1:50052 DOCS_ADDR=127.0.0.1:50053
   HTTP_ADDR=":${PORT:-8080}" api-gateway &
 
 wait -n
-echo "a backend process exited — stopping the container" >&2
+echo "a backend process exited — stopping the container in 60s" >&2
+# Don't let Render restart us in a tight loop: with a wrong DATABASE_URL every
+# restart is another failed login, and Supabase blocks the pooler after a few.
+sleep 60
 exit 1

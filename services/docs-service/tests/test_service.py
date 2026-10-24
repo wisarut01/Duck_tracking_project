@@ -163,3 +163,11 @@ def test_sqlalchemy_url():
     assert sqlalchemy_url("postgresql://u:p@h:5432/postgres") == "postgresql+psycopg://u:p@h:5432/postgres"
     assert sqlalchemy_url("postgres://u:p@h/db") == "postgresql+psycopg://u:p@h/db"
     assert sqlalchemy_url("postgresql+psycopg://u:p@h/db") == "postgresql+psycopg://u:p@h/db"
+
+
+def test_login_rejected():
+    from docs_service.server import login_rejected
+
+    assert login_rejected('FATAL:  password authentication failed for user "postgres"')
+    assert login_rejected("server error: FATAL: (ECIRCUITBREAKER) too many authentication failures")
+    assert not login_rejected("connection refused")
