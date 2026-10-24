@@ -215,32 +215,13 @@ Login ทดสอบ: `duck@example.com` / `password123`
 - **ยังไม่ได้ทดสอบ:** login ผ่าน Supabase / Google ของจริง
 - **GitHub Actions บน GitHub จริง (2026-10-24):**
   - CI (`ci.yml`) ผ่านทุก job
-  - Backup (`backup.yml`) ยัง fail ที่ขั้น dump: `password authentication failed for user "postgres"` เพราะ `SUPABASE_DB_URL` ไม่มีรหัสจริงอยู่ใน URL
-  - แก้ workflow ให้บอกสาเหตุชัดขึ้นแล้ว (`b9a9b21`): เช็ก secret, ใช้ `pg_dump` ตรงกับเวอร์ชันของ server, บอกเมื่อยังไม่มี schema `tb_*`
+  - Backup (`backup.yml`) ผ่าน (สีเขียว) หลังแก้ secret `SUPABASE_DB_URL`
+- **Render ↔ Supabase (2026-10-24):** deploy สำเร็จ ต่อ database ได้ ไม่มี error ใน log
+  - ปัญหาที่เจอ: รหัสใน `DATABASE_URL` มี `@` ที่ไม่ได้ URL-encode (ต้องเขียนเป็น `%40`) ทำให้ login ผิดซ้ำ ๆ จน pooler บล็อก `(ECIRCUITBREAKER)`
+  - แก้โค้ดแล้ว (`0d260d2`): ถ้ารหัสผิดจะหยุดทันทีไม่ลองซ้ำ, error อื่นรอนานขึ้นทีละเท่าตัวสูงสุด 10 วินาที, `start.sh` รอ 60 วินาทีก่อนออก กัน Render restart ถี่
+  - หมายเหตุ: `/health` เช็กแค่ api-gateway ไม่ได้เช็ก database
 
-### เหลือแก้ (ณ 2026-10-24)
-
-**1. Render (`duck-tracking-api`) ต่อ Supabase ไม่ได้**
-- **สาเหตุ:** `DATABASE_URL` ไม่ได้ใส่รหัสจริงแทน `[YOUR-PASSWORD]`
-- **ผลที่ตามมา:** service ลอง login ซ้ำถี่ ๆ จน pooler ของ Supabase บล็อกชั่วคราว: `(ECIRCUITBREAKER) too many authentication failures`
-- **ขั้นตอนแก้:**
-  1. Render → Settings → **Suspend** service เพื่อหยุดยิงซ้ำ
-  2. แก้ `DATABASE_URL` ใน Environment ให้เป็น Session pooler string ที่ถูกต้อง
-     - user ต้องเป็น `postgres.<ref>`
-     - แทน `[YOUR-PASSWORD]` ทั้งวงเล็บด้วยรหัสจริง
-     - อักขระพิเศษในรหัสต้อง URL-encode (หรือ reset รหัสให้มีแต่ตัวอักษรและตัวเลข)
-  3. รอ 10–15 นาทีให้การบล็อกหมดเวลา
-  4. **Resume** แล้วเช็ก `https://duck-tracking-api.onrender.com/health` ว่าได้ `{"status":"ok"}`
-- **แก้โค้ดแล้ว (commit แล้ว รอ push ให้ Render deploy):** ไม่ลอง login ซ้ำเมื่อรหัสผิด (Go `svc.OpenDB` + docs-service), ถ้า DB ยังไม่พร้อมจะรอนานขึ้นทีละเท่าตัวสูงสุด 10 วินาที, และ `deploy/render/start.sh` รอ 60 วินาทีก่อนออก กัน Render restart ถี่
-  - unit test ผ่านแล้ว (Go `svc`, docs-service 11 ข้อ)
-  - ยังไม่ได้ลองกับ Postgres จริงว่ารหัสผิดแล้วหยุดทันที
-- **ข้อสังเกต:** log ที่ขึ้น `retrying…` (ไม่มี `in 1s`) คือโค้ดเก่าที่ยิงซ้ำทุกวินาทีจาก 3 process ทำให้การบล็อกไม่เคยหมด แม้จะแก้รหัสถูกแล้ว
-
-**2. GitHub Actions: Backup**
-- แก้ secret `SUPABASE_DB_URL` (Settings → Secrets and variables → Actions → **Secrets**) ให้เป็น string เดียวกับที่ใช้ใน Render
-- ทำหลังข้อ 1 เสร็จ (ตาราง `tb_*` ถูกสร้างตอน Render start ครั้งแรก) แล้วสั่ง **Run workflow** ให้ได้สีเขียว
-
-**3. หลังจากนั้น**
+### ขั้นต่อไป (ณ 2026-10-24)
 - สร้าง Vercel ตาม `deploy/README.md` ข้อ 4
 - ตั้ง Site URL / Redirect URLs ใน Supabase
 - ลอง login ด้วย Google จากมือถือ
