@@ -19,7 +19,7 @@ export const InvalidCredentials: Story = {
   args: { error: "อีเมลหรือรหัสผ่านไม่ถูกต้อง (UNAUTHENTICATED)" },
 };
 
-/** production: Google อย่างเดียว (Supabase Auth) */
+/** Google อย่างเดียว */
 export const GoogleOnly: Story = {
   args: { onGoogleSignIn: fn(), passwordSignIn: false },
 };
@@ -31,5 +31,12 @@ export const GoogleNotAllowed: Story = {
       "stranger@gmail.com is not allowed to use this app — ask the owner to add it",
   },
 };
-/** มีทั้งสองแบบ */
+/** production (Supabase Auth): มีทั้งสองแบบ */
 export const GoogleAndPassword: Story = { args: { onGoogleSignIn: fn() } };
+/** สมัครแล้ว Supabase ส่งลิงก์ยืนยันไปที่อีเมล */
+export const ConfirmEmailSent: Story = {
+  args: {
+    onGoogleSignIn: fn(),
+    info: "ส่งลิงก์ยืนยันไปที่ duck@example.com แล้ว กดลิงก์ในอีเมลเพื่อเข้าใช้งาน",
+  },
+};

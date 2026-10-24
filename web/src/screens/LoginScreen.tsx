@@ -13,9 +13,11 @@ export interface LoginScreenProps {
   loading?: boolean;
   /** เช่น "invalid or expired token" / "อีเมลหรือรหัสผ่านไม่ถูกต้อง" */
   error?: string;
+  /** ข้อความแจ้ง (ไม่ใช่ error) เช่น "ส่งลิงก์ยืนยันไปที่อีเมลแล้ว" */
+  info?: string;
   /** มี = โชว์ปุ่ม "เข้าสู่ระบบด้วย Google" (production ใช้ Supabase Auth) */
   onGoogleSignIn?: () => void;
-  /** false = ซ่อนฟอร์มอีเมล/รหัสผ่าน (production ปิด register/login ด้วยรหัสผ่านไว้) */
+  /** false = ซ่อนฟอร์มอีเมล/รหัสผ่าน */
   passwordSignIn?: boolean;
 }
 
@@ -26,6 +28,7 @@ export function LoginScreen({
   onRegister,
   loading = false,
   error,
+  info,
   onGoogleSignIn,
   passwordSignIn = true,
 }: LoginScreenProps) {
@@ -102,6 +105,14 @@ export function LoginScreen({
             className="mb-4 rounded-lg bg-danger-soft px-3 py-2 text-sm font-medium text-danger"
           >
             {error}
+          </p>
+        )}
+        {info && !error && (
+          <p
+            role="status"
+            className="mb-4 rounded-lg bg-success-soft px-3 py-2 text-sm font-medium text-success"
+          >
+            {info}
           </p>
         )}
 

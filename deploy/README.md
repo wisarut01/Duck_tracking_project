@@ -3,12 +3,12 @@
 ```
 มือถือ / คอม ──HTTPS──> Vercel (เว็บ)  ── /api/* ──> Render (gateway + auth/tracker/docs ใน container เดียว)
                     │                                    │
-                    └── login ด้วย Google ──> Supabase Auth  └──> Supabase Postgres (schema tb_auth / tb_tracker / tb_docs)
+                    └── login (Google / อีเมล) ──> Supabase Auth  └──> Supabase Postgres (schema tb_auth / tb_tracker / tb_docs)
 ```
 
 - **ฟรีทั้งหมด** (Vercel Hobby, Render Free, Supabase Free)
 - Render free จะหลับเมื่อไม่มีคนใช้ 15 นาที **การเปิดครั้งแรกหลังจากนั้นต้องรอราว 1 นาที**
-- **ใครมีบัญชี Google ก็ sign in ได้** (`ALLOWED_EMAILS=*`) และทุกคนเห็น แก้ และลบข้อมูลได้ทั้งหมดเท่ากัน เพราะ MVP ยังไม่มีสิทธิ์แยกราย project อย่าแชร์ URL ในที่สาธารณะ ถ้าอยากจำกัดคนเข้าทีหลัง ดูหัวข้อ "จำกัดคนเข้าใช้"
+- **ใครก็ sign in ได้** ด้วย Google หรือสมัครด้วยอีเมล/รหัสผ่าน (`ALLOWED_EMAILS=*`) และทุกคนเห็น แก้ และลบข้อมูลได้ทั้งหมดเท่ากัน เพราะ MVP ยังไม่มีสิทธิ์แยกราย project อย่าแชร์ URL ในที่สาธารณะ ถ้าอยากจำกัดคนเข้าทีหลัง ดูหัวข้อ "จำกัดคนเข้าใช้"
 - ทำตามลำดับข้างล่าง ค่าที่เป็น **ความลับ** ให้ใส่ใน dashboard เท่านั้น ห้ามใส่ใน git หรือส่งในแชต
 
 ชื่อที่ไฟล์ในโปรเจกต์ใช้อยู่ (ถ้าชื่อไหนมีคนใช้แล้ว ดูหัวข้อ "ถ้าได้ชื่ออื่น" ด้านล่าง):
@@ -21,9 +21,11 @@
 ## 1. Supabase
 
 1. **New project** → ตั้งชื่อ `tracking-board`, region **Singapore**, ตั้ง Database password แล้วจดเก็บไว้
-2. **Authentication → Sign In / Providers → Email** → ปิด (เราใช้ Google อย่างเดียว)
+2. **Authentication → Sign In / Providers → Email** → เปิด (login ด้วยอีเมล/รหัสผ่าน)
+   - **Confirm email ต้องเปิดไว้** ไม่งั้นใครก็สมัครด้วยอีเมลของคนอื่นแล้วเข้าบัญชีเขาได้
+   - Supabase ส่งอีเมลยืนยันเองได้แค่ไปที่อีเมลของสมาชิกใน Supabase project (และไม่กี่ฉบับต่อชั่วโมง) ถ้าจะให้คนอื่นสมัครได้ ต้องตั้ง SMTP เอง ดูข้อ 1.5
 3. **Authentication → URL Configuration**
-   - Site URL: `https://duck-tracking.vercel.app`
+   - Site URL: `https://duck-tracking.vercel.app` (ต้องมี `https://` นำหน้า)
    - Redirect URLs: เพิ่ม `https://duck-tracking.vercel.app/**` และ `http://localhost:5173/**`
 4. จดค่าเหล่านี้ไว้ใช้ในขั้นต่อไป:
 
@@ -32,6 +34,13 @@
 | Project URL `https://<ref>.supabase.co` | Project Settings → Data API (หรือหน้า Connect) | ไม่ |
 | Publishable key (`sb_publishable_…` หรือ anon key แบบเก่า) | Project Settings → API Keys | ไม่ (อยู่ในเว็บอยู่แล้ว) |
 | Connection string แบบ **Session pooler** `postgresql://postgres.<ref>:<password>@aws-…pooler.supabase.com:5432/postgres` | ปุ่ม **Connect** ด้านบน → Session pooler | **ใช่** |
+
+5. **ส่งอีเมลยืนยันด้วย Gmail** (ถ้าให้คนอื่นสมัครด้วยอีเมล)
+   - Google Account → Security → เปิด 2-Step Verification → **App passwords** → สร้างรหัส 16 ตัว
+   - Supabase → **Authentication → Emails → SMTP Settings** → Enable custom SMTP
+     - Host `smtp.gmail.com`, Port `587`, Username = Gmail ของคุณ, Password = App password
+     - Sender email = Gmail เดียวกัน, Sender name = `Duck Tracking`
+   - Gmail ส่งได้ประมาณ 500 ฉบับต่อวัน พอสำหรับใช้กันในทีม
 
 > - ใน connection string ให้แทน `[YOUR-PASSWORD]` ด้วยรหัสจริง ถ้ารหัสมีอักขระพิเศษ เช่น `@ : / ? #` ต้อง URL-encode ก่อน (เช่น `@` → `%40`)
 > - ใช้แบบ **Session pooler** เท่านั้น เพราะแบบ Direct บน free plan ใช้ได้เฉพาะ IPv6 ซึ่ง Render ต่อไม่ได้
@@ -124,6 +133,8 @@ Render → `duck-tracking-api` → **Environment** → เปลี่ยน `AL
 |---|---|
 | เปิดเว็บแล้วเจอหน้า login ของ Vercel | เปิด URL ของ deployment (มี hash หรือ `-git-`) แทน `duck-tracking.vercel.app` หรือ Vercel → Settings → **Deployment Protection** → ปิด **Vercel Authentication** |
 | เปิดเว็บแล้วโหลดนาน หรือขึ้น error ครั้งแรก | Render กำลังตื่น รอ ~1 นาทีแล้ว reload |
+| login แล้วเด้งไป `https://<ref>.supabase.co/duck-tracking.vercel.app` (404 `request path is invalid`) | Site URL ใน Supabase ไม่มี `https://` นำหน้า |
+| สมัครด้วยอีเมลแล้วไม่ได้รับอีเมลยืนยัน | ยังไม่ได้ตั้ง SMTP (ข้อ 1.5) หรืออยู่ใน Spam |
 | login Google แล้วเด้งไป `localhost` | Site URL / Redirect URLs ใน Supabase ยังไม่ใช่ URL ของ Vercel |
 | "… is not allowed to use this app" | ตั้ง `ALLOWED_EMAILS` เป็นรายชื่อไว้ และอีเมลนั้นไม่อยู่ในรายชื่อ |
 | `redirect_uri_mismatch` จาก Google | Redirect URI ใน Google ไม่ตรงกับ Callback URL ของ Supabase |
