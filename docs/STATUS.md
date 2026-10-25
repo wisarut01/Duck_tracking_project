@@ -1,6 +1,6 @@
 # Project Status — Tracking Board
 
-> อัปเดตล่าสุด: 2026-10-23
+> อัปเดตล่าสุด: 2026-10-25
 
 ## ภาพรวม
 
@@ -13,8 +13,8 @@
 | Phase 2a — หน้าเว็บดึง/บันทึกข้อมูลผ่าน API (ตอนนี้ต่อ mock :4010) | ✅ เสร็จ (2026-10-23) |
 | Phase 2b — Service จริง: gateway (Go Fiber) + auth / tracker (Go) + docs (Python) + Postgres | ✅ เสร็จ (2026-10-23) |
 | Phase 2c — สลับเว็บและ test ไปใช้ gateway จริง (:8080), E2E ผ่าน → **MVP พร้อมใช้** | ✅ เสร็จ (2026-10-23) — **MVP พร้อมใช้** |
-| ส่วนที่ 2 — บทเรียน FE / BE (สอนจากโค้ด MVP ที่เสร็จแล้ว) | 🟡 วางแผนแล้ว: 19 task ใน 14 วัน ดู `docs/LEARNING_PLAN.md` |
-| Phase 3 — deploy ใช้เองจากที่ไหนก็ได้: Vercel + Render + Supabase, login ด้วย Gmail (แผนด้านล่าง) | 🟡 กำลังทำ (เริ่ม 2026-10-23) |
+| ส่วนที่ 2 — บทเรียน FE / BE (สอนจากโค้ด MVP ที่เสร็จแล้ว) | 🟡 พร้อมเริ่ม: 19 task อยู่บน board project **LRN** แล้ว (2026-10-25) ดู `docs/LEARNING_PLAN.md` |
+| Phase 3 — deploy ใช้เองจากที่ไหนก็ได้: Vercel + Render + Supabase, login ด้วย Gmail (แผนด้านล่าง) | ✅ ใช้งานได้ (2026-10-25) เหลือตรวจรับ 2 ข้อ และงานก่อนเปิดให้คนอื่นใช้ (ดู "ขั้นต่อไป") |
 
 ## Phase 0 — Contract
 
@@ -160,10 +160,10 @@ Login ทดสอบ: `duck@example.com` / `password123`
 
 ## ขั้นต่อไป
 
-1. **ส่วนที่ 2 — บทเรียน** (MVP เสร็จแล้ว เริ่มได้เลย)
+1. **ส่วนที่ 2 — บทเรียน** เริ่มจาก LRN-1 บน board
    - **FE:** React + TS + Tailwind + react-query อิงจากโค้ดใน `web/`
    - **BE:** Go Fiber gateway, gRPC microservice (Go + GORM) และ Python docs-service อิงจากโค้ด Phase 2b
-2. **Phase 3** — deploy (แผนด้านล่าง)
+2. **ก่อนเปิดให้คนอื่นใช้** ดูหัวข้อ "ขั้นต่อไป (ณ 2026-10-25)" ท้ายไฟล์
 
 ## แผน Phase 3 — deploy (ตกลง 2026-10-23)
 
@@ -213,7 +213,7 @@ Login ทดสอบ: `duck@example.com` / `password123`
   - image ของ Render รันกับ Postgres ทดสอบ (database เดียว, 3 schema): API **105/105**, ใช้ RAM ~77 MB (free ให้ 512 MB)
   - เว็บ build แบบ production + `/api` ผ่าน proxy แบบเดียวกับ Vercel: E2E **11/11**
   - backup → เข้ารหัส → ถอดรหัส → `pg_restore` ลง database ใหม่: จำนวนแถวตรงกันทุกตาราง
-- **ยังไม่ได้ทดสอบ:** login ผ่าน Supabase / Google ของจริง
+- **ยังไม่ได้ทดสอบ:** login ด้วย Google บน production (login ด้วยอีเมล + รหัสผ่านใช้ได้แล้ว ดูด้านล่าง)
 - **GitHub Actions บน GitHub จริง (2026-10-24):**
   - CI (`ci.yml`) ผ่านทุก job
   - Backup (`backup.yml`) ผ่าน (สีเขียว) หลังแก้ secret `SUPABASE_DB_URL`
@@ -222,7 +222,16 @@ Login ทดสอบ: `duck@example.com` / `password123`
   - แก้โค้ดแล้ว (`0d260d2`): ถ้ารหัสผิดจะหยุดทันทีไม่ลองซ้ำ, error อื่นรอนานขึ้นทีละเท่าตัวสูงสุด 10 วินาที, `start.sh` รอ 60 วินาทีก่อนออก กัน Render restart ถี่
   - หมายเหตุ: `/health` เช็กแค่ api-gateway ไม่ได้เช็ก database
 
-### ขั้นต่อไป (ณ 2026-10-24)
-- สร้าง Vercel ตาม `deploy/README.md` ข้อ 4
-- ตั้ง Site URL / Redirect URLs ใน Supabase
-- ลอง login ด้วย Google จากมือถือ
+- **Vercel + Supabase Auth (2026-10-25):** สร้าง Vercel project แล้ว, ตั้ง Site URL / Redirect URLs และอีเมลใน Supabase แล้ว
+  - login ด้วยอีเมล + รหัสผ่านบน `https://duck-tracking.vercel.app` ใช้ได้
+  - เอา token จากการ login นั้นไปรัน `scripts/lessons/seed.mjs` กับ production ได้: สร้าง project LRN และ task LRN-1 ถึง LRN-19
+
+### ขั้นต่อไป (ณ 2026-10-25)
+- **ตรวจรับ Phase 3 ที่ยังค้าง:** login ด้วย Google จากมือถือ; กู้ backup ของ production จริงหนึ่งครั้ง
+- **ก่อนเปิดให้คนอื่นใช้** (เรียงจากสำคัญมากไปน้อย):
+  1. สิทธิ์: ตอนนี้ `ALLOWED_EMAILS=*` และไม่มีสิทธิ์ราย project → ใครสมัครได้ก็เห็น / แก้ / ลบข้อมูลของทุกคน ต้องจำกัดอีเมล หรือทำสมาชิกราย project
+  2. rate limit ที่ gateway (ยังไม่มี) และจำกัดขนาด request body
+  3. `/health` ให้เช็ก database ด้วย + uptime monitor แจ้งเตือนเมื่อเว็บล่ม
+  4. migration แบบมีเวอร์ชัน ก่อนเปลี่ยน schema ตอนที่มีข้อมูลของคนอื่นอยู่
+  5. ข้อจำกัด free tier: Render หลับหลังว่าง 15 นาที (ปลุก ~1 นาที), Supabase free 500 MB, Vercel Hobby ห้ามใช้เชิงพาณิชย์
+- reverse proxy / load balancer / HTTPS ไม่ต้องทำเอง: Vercel (CDN + ส่ง `/api` ต่อ) และ Render มีให้แล้ว
