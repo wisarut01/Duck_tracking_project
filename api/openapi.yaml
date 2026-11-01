@@ -158,6 +158,24 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [projects]
+      summary: แก้ชื่อ / คำอธิบาย project (key เปลี่ยนไม่ได้)
+      operationId: updateProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProjectRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Project' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /projects/{projectKey}/issues:
     parameters:
@@ -305,6 +323,40 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /issues/{issueKey}/comments/{commentId}:
+    parameters:
+      - $ref: '#/components/parameters/IssueKey'
+      - $ref: '#/components/parameters/CommentId'
+    patch:
+      tags: [comments]
+      summary: แก้ comment (เฉพาะคนเขียน)
+      operationId: updateComment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateCommentRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Comment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [comments]
+      summary: ลบ comment (เฉพาะคนเขียน)
+      operationId: deleteComment
+      responses:
+        '204': { description: Deleted }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /issues/{issueKey}/links:
     parameters:
       - $ref: '#/components/parameters/IssueKey'
@@ -395,6 +447,24 @@ paths:
       tags: [spaces]
       summary: รายละเอียด space
       operationId: getSpace
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Space' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [spaces]
+      summary: แก้ชื่อ / คำอธิบาย space (key เปลี่ยนไม่ได้)
+      operationId: updateSpace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateSpaceRequest' }
       responses:
         '200':
           description: OK
@@ -542,6 +612,11 @@ components:
       in: path
       required: true
       schema: { type: string, pattern: '^[A-Z][A-Z0-9]{1,9}$', example: ENG }
+    CommentId:
+      name: commentId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     PageId:
       name: pageId
       in: path
@@ -570,7 +645,7 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: UNAUTHENTICATED, message: invalid or expired token } }
     Forbidden:
-      description: login แล้วแต่ไม่มีสิทธิ์ (อีเมลไม่อยู่ใน allowlist) หรือปิด login ด้วยรหัสผ่านไว้
+      description: login แล้วแต่ไม่มีสิทธิ์ (อีเมลไม่อยู่ใน allowlist, ปิด login ด้วยรหัสผ่านไว้ หรือแก้/ลบ comment ของคนอื่น)
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -648,6 +723,12 @@ components:
       properties:
         key: { type: string, pattern: '^[A-Z][A-Z0-9]{1,9}$', example: TB }
         name: { type: string, minLength: 1, pattern: '\S', maxLength: 100, example: Tracking Board }
+        description: { type: string, nullable: true }
+    UpdateProjectRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, pattern: '\S', maxLength: 100 }
         description: { type: string, nullable: true }
 
     IssueType:
@@ -746,7 +827,13 @@ components:
         author: { $ref: '#/components/schemas/User' }
         body: { type: string, description: Markdown, example: เริ่มทำแล้ว ใช้ dnd-kit }
         createdAt: { type: string, format: date-time, example: '2026-10-03T08:30:00Z' }
+        editedAt: { type: string, format: date-time, nullable: true, description: แก้ไขล่าสุดเมื่อไหร่ หรือ `null` ถ้ายังไม่เคยแก้, example: null }
     CreateCommentRequest:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string, minLength: 1, pattern: '\S', maxLength: 5000 }
+    UpdateCommentRequest:
       type: object
       required: [body]
       properties:
@@ -773,6 +860,12 @@ components:
       properties:
         key: { type: string, pattern: '^[A-Z][A-Z0-9]{1,9}$', example: ENG }
         name: { type: string, minLength: 1, pattern: '\S', maxLength: 100, example: Engineering }
+        description: { type: string, nullable: true }
+    UpdateSpaceRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, pattern: '\S', maxLength: 100 }
         description: { type: string, nullable: true }
 
     PageSummary:

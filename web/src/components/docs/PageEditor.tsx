@@ -1,19 +1,23 @@
 import { useState, type KeyboardEvent } from 'react';
-import { Columns2, Eye, Pencil, Save } from 'lucide-react';
+import { Check, Columns2, Eye, History, Pencil } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { readDraft, removeDraft } from '@/lib/pageDraft';
 import type { IssueSummary, Page, UpdatePageRequest } from '@/types/api';
 import { Button } from '@/components/ui/Button';
 import { MarkdownView } from './MarkdownView';
+import { usePageAutosave, type AutosaveStatus } from './usePageAutosave';
 
 export type EditorMode = 'edit' | 'split' | 'preview';
 
 export interface PageEditorProps {
-  /** หน้าที่จะแก้ — ใช้แค่ title กับ contentMd */
-  page: Pick<Page, 'title' | 'contentMd'>;
-  /** ได้เฉพาะ field ที่เปลี่ยน → ส่งไป PATCH /pages/{id} ได้ตรงๆ */
-  onSave?: (changes: UpdatePageRequest) => void;
-  onCancel?: () => void;
-  saving?: boolean;
+  /** หน้าที่จะแก้ */
+  page: Pick<Page, 'id' | 'title' | 'contentMd' | 'updatedAt'>;
+  /** บันทึกอัตโนมัติ: ได้เฉพาะ field ที่เปลี่ยน → ส่งไป PATCH /pages/{id} ได้ตรงๆ; throw เมื่อไม่สำเร็จ */
+  onSave?: (changes: UpdatePageRequest) => Promise<unknown> | void;
+  /** บันทึกไม่สำเร็จหลัง editor ปิดไปแล้ว */
+  onBackgroundSaveError?: (error: unknown) => void;
+  /** กด "เสร็จสิ้น" และบันทึกครบแล้ว */
+  onDone?: () => void;
   defaultMode?: EditorMode;
   resolveIssue?: (issueKey: string) => IssueSummary | undefined;
 }
@@ -24,31 +28,63 @@ const modes: { value: EditorMode; label: string; icon: typeof Pencil }[] = [
   { value: 'preview', label: 'Preview', icon: Eye },
 ];
 
+const statusLabels: Record<AutosaveStatus, string> = {
+  saved: 'บันทึกอัตโนมัติแล้ว',
+  pending: '● รอบันทึกอัตโนมัติ…',
+  saving: 'กำลังบันทึก…',
+  error: 'บันทึกไม่สำเร็จ กำลังลองใหม่ — ข้อความเก็บไว้ในเครื่องแล้ว',
+};
+
 /**
  * ตัวแก้ไขหน้า Docs: ซ้าย = Markdown, ขวา = Preview สด (โหมด split)
- * กด Ctrl/⌘ + S เพื่อบันทึก
+ * บันทึกอัตโนมัติ (ดู usePageAutosave) — Ctrl/⌘ + S = บันทึกเดี๋ยวนี้
  */
-export function PageEditor({ page, onSave, onCancel, saving = false, defaultMode = 'split', resolveIssue }: PageEditorProps) {
+export function PageEditor({ page, onSave, onBackgroundSaveError, onDone, defaultMode = 'split', resolveIssue }: PageEditorProps) {
+  // ฉบับร่างที่ค้างจากครั้งก่อน (อ่านครั้งเดียวตอนเปิด editor)
+  const [storedDraft] = useState(() => {
+    const draft = readDraft(page.id);
+    return draft && (draft.title !== page.title || draft.contentMd !== page.contentMd) ? draft : null;
+  });
+  // หน้ายังเป็นเวอร์ชันเดียวกับตอนเขียนร่าง → ใช้ต่อได้เลย; มีคนแก้ไปแล้ว → ให้ผู้ใช้เลือก จะได้ไม่ทับของใหม่เงียบๆ
+  const resume = storedDraft?.baseUpdatedAt === page.updatedAt;
+  const [conflictDraft, setConflictDraft] = useState(resume ? null : storedDraft);
+
   // "controlled input": ค่าใน state เป็นตัวจริง, input แค่แสดงค่าและแจ้งเมื่อเปลี่ยน
-  const [title, setTitle] = useState(page.title);
-  const [content, setContent] = useState(page.contentMd);
+  const [title, setTitle] = useState(resume && storedDraft ? storedDraft.title : page.title);
+  const [content, setContent] = useState(resume && storedDraft ? storedDraft.contentMd : page.contentMd);
   const [mode, setMode] = useState<EditorMode>(defaultMode);
+  const { status, flush } = usePageAutosave({
+    page,
+    title,
+    content,
+    setTitle,
+    onSave,
+    onBackgroundError: onBackgroundSaveError,
+    keepStoredDraft: conflictDraft !== null,
+  });
+  const titleBlank = !title.trim();
 
-  const changes: UpdatePageRequest = {};
-  if (title !== page.title) changes.title = title;
-  if (content !== page.contentMd) changes.contentMd = content;
-  const isDirty = Object.keys(changes).length > 0;
-  const canSave = isDirty && title.trim().length > 0 && !saving;
-
-  function save() {
-    if (canSave) onSave?.(changes);
+  async function finish() {
+    if (await flush()) onDone?.();
   }
 
   function handleKeyDown(event: KeyboardEvent) {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
       event.preventDefault(); // กันเบราว์เซอร์เปิดหน้าต่าง "Save page"
-      save();
+      void flush();
     }
+  }
+
+  function restoreDraft() {
+    if (!conflictDraft) return;
+    setTitle(conflictDraft.title);
+    setContent(conflictDraft.contentMd);
+    setConflictDraft(null);
+  }
+
+  function discardDraft() {
+    removeDraft(page.id);
+    setConflictDraft(null);
   }
 
   return (
@@ -73,20 +109,28 @@ export function PageEditor({ page, onSave, onCancel, saving = false, defaultMode
             </button>
           ))}
         </div>
-        <span className="text-xs text-ink-subtle" aria-live="polite">
-          {saving ? 'กำลังบันทึก…' : isDirty ? '● มีการแก้ไขที่ยังไม่บันทึก' : 'บันทึกแล้ว'}
+        <span className={cn('text-xs', status === 'error' || titleBlank ? 'font-bold text-danger' : 'text-ink-subtle')} aria-live="polite">
+          {titleBlank ? 'ใส่ชื่อหน้าก่อน จึงจะบันทึกชื่อได้' : statusLabels[status]}
         </span>
         <div className="ml-auto flex gap-2">
-          {onCancel && (
-            <Button variant="ghost" size="sm" onClick={onCancel}>
-              ยกเลิก
-            </Button>
-          )}
-          <Button size="sm" leftIcon={<Save size={14} aria-hidden />} onClick={save} disabled={!canSave} loading={saving}>
-            บันทึก
+          <Button size="sm" leftIcon={<Check size={14} aria-hidden />} onClick={() => void finish()} disabled={titleBlank} loading={status === 'saving'}>
+            เสร็จสิ้น
           </Button>
         </div>
       </div>
+
+      {conflictDraft && (
+        <div role="alert" className="flex flex-wrap items-center gap-2 border-b border-border bg-sticky-yellow px-4 py-2.5 text-sm text-sticky-yellow-ink">
+          <History size={16} aria-hidden />
+          <span className="min-w-0 flex-1">มีฉบับร่างที่ยังไม่ได้บันทึก แต่หน้านี้ถูกแก้ไปแล้วหลังจากนั้น</span>
+          <Button variant="secondary" size="sm" onClick={restoreDraft}>
+            ใช้ฉบับร่าง
+          </Button>
+          <Button variant="ghost" size="sm" onClick={discardDraft}>
+            ทิ้งฉบับร่าง
+          </Button>
+        </div>
+      )}
 
       {/* Title */}
       <input

@@ -19,6 +19,8 @@ import type {
   RegisterRequest,
   UpdateIssueRequest,
   UpdatePageRequest,
+  UpdateProjectRequest,
+  UpdateSpaceRequest,
 } from '@/types/api';
 import { computePosition } from '@/lib/position';
 import { ISSUE_KEY_PATTERN } from '@/lib/mentions';
@@ -91,6 +93,15 @@ export function useCreateProjectMutation() {
   });
 }
 
+export function useUpdateProjectMutation(projectKey: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UpdateProjectRequest) =>
+      unwrap(api.PATCH('/projects/{projectKey}', { params: { path: { projectKey } }, body })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.projects }), // รวม project(key) ด้วย
+  });
+}
+
 export function useProjects() {
   return useQuery({ queryKey: queryKeys.projects, queryFn: () => unwrap(api.GET('/projects')) });
 }
@@ -140,15 +151,24 @@ export function useCreateIssueMutation(projectKey: string) {
   });
 }
 
-export function useUpdateIssueMutation(issueKey: string) {
+/** issueKey อยู่ใน variables: ตอนปิด drawer เรายังบันทึกของ issue เดิมได้ แม้ hook จะเปลี่ยนไปดู issue อื่นแล้ว */
+export function useUpdateIssueMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: UpdateIssueRequest) =>
-      unwrap(api.PATCH('/issues/{issueKey}', { params: { path: { issueKey } }, body })),
+    mutationFn: ({ issueKey, changes }: { issueKey: string; changes: UpdateIssueRequest }) =>
+      unwrap(api.PATCH('/issues/{issueKey}', { params: { path: { issueKey } }, body: changes })),
     onSuccess: (issue) => {
-      queryClient.setQueryData(queryKeys.issue(issueKey), issue);
+      queryClient.setQueryData(queryKeys.issue(issue.key), issue);
       invalidateIssues(queryClient);
     },
+  });
+}
+
+export function useDeleteIssueMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (issueKey: string) => unwrap(api.DELETE('/issues/{issueKey}', { params: { path: { issueKey } } })),
+    onSuccess: () => invalidateIssues(queryClient),
   });
 }
 
@@ -194,6 +214,24 @@ export function useAddCommentMutation(issueKey: string) {
   return useMutation({
     mutationFn: (body: string) =>
       unwrap(api.POST('/issues/{issueKey}/comments', { params: { path: { issueKey } }, body: { body } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.comments(issueKey) }),
+  });
+}
+
+export function useUpdateCommentMutation(issueKey: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ commentId, body }: { commentId: string; body: string }) =>
+      unwrap(api.PATCH('/issues/{issueKey}/comments/{commentId}', { params: { path: { issueKey, commentId } }, body: { body } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.comments(issueKey) }),
+  });
+}
+
+export function useDeleteCommentMutation(issueKey: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (commentId: string) =>
+      unwrap(api.DELETE('/issues/{issueKey}/comments/{commentId}', { params: { path: { issueKey, commentId } } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.comments(issueKey) }),
   });
 }
@@ -244,6 +282,14 @@ export function useCreateSpaceMutation() {
   });
 }
 
+export function useUpdateSpaceMutation(spaceKey: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UpdateSpaceRequest) => unwrap(api.PATCH('/spaces/{spaceKey}', { params: { path: { spaceKey } }, body })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.spaces }), // รวม space(key) ด้วย
+  });
+}
+
 export function useSpaces() {
   return useQuery({ queryKey: queryKeys.spaces, queryFn: () => unwrap(api.GET('/spaces')) });
 }
@@ -287,14 +333,44 @@ export function useCreatePageMutation(spaceKey: string) {
   });
 }
 
-export function useUpdatePageMutation(pageId: string) {
+/** เบราว์เซอร์ส่ง request แบบ keepalive ได้ไม่เกิน 64 KB ต่อครั้ง */
+const KEEPALIVE_MAX_BYTES = 60_000;
+
+/**
+ * pageId อยู่ใน variables: autosave ตอนเปลี่ยนหน้าต้องบันทึกลงหน้าเดิม แม้ URL จะไปหน้าใหม่แล้ว
+ * keepalive = request ยังไปถึง server แม้ผู้ใช้ปิด tab ไปแล้ว (ถ้าใหญ่เกิน ฉบับร่างในเครื่องยังอยู่)
+ */
+export function useUpdatePageMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: UpdatePageRequest) => unwrap(api.PATCH('/pages/{pageId}', { params: { path: { pageId } }, body })),
+    mutationFn: ({ pageId, changes }: { pageId: string; changes: UpdatePageRequest }) =>
+      unwrap(
+        api.PATCH('/pages/{pageId}', {
+          params: { path: { pageId } },
+          body: changes,
+          keepalive: new Blob([JSON.stringify(changes)]).size < KEEPALIVE_MAX_BYTES,
+        }),
+      ),
+    // กัน refetch ที่เริ่มก่อนบันทึกมาทับค่าใหม่ใน cache
+    onMutate: ({ pageId }) => queryClient.cancelQueries({ queryKey: queryKeys.page(pageId) }),
     onSuccess: (page) => {
-      queryClient.setQueryData(queryKeys.page(pageId), page);
+      queryClient.setQueryData(queryKeys.page(page.id), page);
       void queryClient.invalidateQueries({ queryKey: queryKeys.pageTree(page.spaceKey) }); // title ใน tree
       void queryClient.invalidateQueries({ queryKey: ['search'] });
+    },
+  });
+}
+
+/** ลบหน้าและหน้าลูกทั้งหมด — รอ tree โหลดใหม่ก่อนจบ คนเรียกจะได้ไม่พาไปหน้าที่เพิ่งลบ */
+export function useDeletePageMutation(spaceKey: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (pageId: string) => unwrap(api.DELETE('/pages/{pageId}', { params: { path: { pageId } } })),
+    onSuccess: async () => {
+      void queryClient.invalidateQueries({ queryKey: ['search'] });
+      void queryClient.invalidateQueries({ queryKey: ['issue-links'] });
+      invalidateIssues(queryClient); // linkedPageCount เปลี่ยน
+      await queryClient.invalidateQueries({ queryKey: queryKeys.pageTree(spaceKey) });
     },
   });
 }

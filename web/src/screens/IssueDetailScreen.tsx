@@ -26,8 +26,7 @@ export function IssueDetailScreen({ issue, comments, linkedPages, loadingComment
     >
       <div className="mx-auto max-w-6xl p-3 sm:p-6">
         <IssueDetailPanel
-          // key รวม updatedAt → ข้อมูลจาก server เปลี่ยนเมื่อไหร่ panel เริ่มใหม่จากค่าล่าสุด
-          key={`${issue.key}-${issue.updatedAt}`}
+          key={issue.key}
           issue={issue}
           comments={comments}
           linkedPages={linkedPages}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronRight, FileText, Plus } from 'lucide-react';
+import { ChevronRight, FileText, Pencil, Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import type { PageTreeNode } from '@/types/api';
 
@@ -11,13 +11,18 @@ export interface PageTreeProps {
   onSelect?: (pageId: string) => void;
   /** ปุ่ม + เพื่อสร้างหน้าย่อย (parentId = null คือหน้าบนสุด) */
   onCreatePage?: (parentId: string | null) => void;
+  /** ปุ่มเปลี่ยนชื่อ / ลบ ในแต่ละแถว — ไม่ส่งมา = ไม่มีปุ่ม */
+  onRenamePage?: (node: PageTreeNode) => void;
+  onDeletePage?: (node: PageTreeNode) => void;
+  /** ปุ่มแก้ไขข้าง label (ชื่อ space) */
+  onEditLabel?: () => void;
   /** id ที่ให้ขยายไว้ตั้งแต่แรก — ถ้าไม่ส่ง จะขยาย "เส้นทาง" ไปหาหน้า active อัตโนมัติ */
   defaultExpandedIds?: string[];
   label?: string;
 }
 
 /** หา id ของ node บรรพบุรุษทั้งหมดของ targetId (ไว้ขยายให้เห็นหน้า active) */
-function findAncestorIds(nodes: PageTreeNode[], targetId: string, path: string[] = []): string[] | null {
+export function findAncestorIds(nodes: PageTreeNode[], targetId: string, path: string[] = []): string[] | null {
   for (const node of nodes) {
     if (node.id === targetId) return path;
     const found = findAncestorIds(node.children, targetId, [...path, node.id]);
@@ -30,7 +35,7 @@ function findAncestorIds(nodes: PageTreeNode[], targetId: string, path: string[]
  * ต้นไม้หน้า Docs (ซ้อนกันได้ไม่จำกัดชั้น) — ใช้ role="tree" / "treeitem" ตาม WAI-ARIA
  * คลิกลูกศรเพื่อขยาย/ยุบ, คลิกชื่อเพื่อเปิดหน้า
  */
-export function PageTree({ nodes, activeId, onSelect, onCreatePage, defaultExpandedIds, label = 'Pages' }: PageTreeProps) {
+export function PageTree({ nodes, activeId, onSelect, onCreatePage, onRenamePage, onDeletePage, onEditLabel, defaultExpandedIds, label = 'Pages' }: PageTreeProps) {
   // Set<string> = ชุดของ id ที่ขยายอยู่ (เช็ก/เพิ่ม/ลบได้เร็ว)
   const [expanded, setExpanded] = useState<Set<string>>(
     () => new Set(defaultExpandedIds ?? (activeId ? findAncestorIds(nodes, activeId) ?? [] : [])),
@@ -47,8 +52,18 @@ export function PageTree({ nodes, activeId, onSelect, onCreatePage, defaultExpan
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between px-2">
-        <span className="text-xs font-bold tracking-wide text-ink-subtle uppercase">{label}</span>
+      <div className="flex items-center gap-1 px-2">
+        <span className="min-w-0 flex-1 truncate text-xs font-bold tracking-wide text-ink-subtle uppercase">{label}</span>
+        {onEditLabel && (
+          <button
+            type="button"
+            onClick={onEditLabel}
+            aria-label={`แก้ไข ${label}`}
+            className="rounded-md p-1 text-ink-subtle hover:bg-surface-muted hover:text-ink"
+          >
+            <Pencil size={14} aria-hidden />
+          </button>
+        )}
         {onCreatePage && (
           <button
             type="button"
@@ -71,6 +86,8 @@ export function PageTree({ nodes, activeId, onSelect, onCreatePage, defaultExpan
             onToggle={toggle}
             onSelect={onSelect}
             onCreatePage={onCreatePage}
+            onRenamePage={onRenamePage}
+            onDeletePage={onDeletePage}
           />
         ))}
       </ul>
@@ -86,10 +103,15 @@ interface TreeItemProps {
   onToggle: (id: string) => void;
   onSelect?: (pageId: string) => void;
   onCreatePage?: (parentId: string | null) => void;
+  onRenamePage?: (node: PageTreeNode) => void;
+  onDeletePage?: (node: PageTreeNode) => void;
 }
 
+/** ปุ่มเล็กท้ายแถว */
+const rowActionClass = 'rounded-md p-1 text-ink-subtle hover:bg-surface-sunken hover:text-ink';
+
 /** หนึ่งแถวของต้นไม้ — เรียกตัวเองซ้ำ (recursive) สำหรับ children */
-function TreeItem({ node, depth, activeId, expanded, onToggle, onSelect, onCreatePage }: TreeItemProps) {
+function TreeItem({ node, depth, activeId, expanded, onToggle, onSelect, onCreatePage, onRenamePage, onDeletePage }: TreeItemProps) {
   const hasChildren = node.children.length > 0;
   const isExpanded = expanded.has(node.id);
   const isActive = node.id === activeId;
@@ -131,16 +153,24 @@ function TreeItem({ node, depth, activeId, expanded, onToggle, onSelect, onCreat
         >
           {node.title}
         </button>
-        {onCreatePage && (
-          <button
-            type="button"
-            onClick={() => onCreatePage(node.id)}
-            aria-label={`สร้างหน้าย่อยใน ${node.title}`}
-            className="rounded-md p-1 text-ink-subtle opacity-0 group-hover:opacity-100 hover:bg-surface-sunken hover:text-ink focus-visible:opacity-100"
-          >
-            <Plus size={13} aria-hidden />
-          </button>
-        )}
+        {/* กว้าง 0 จนกว่าจะชี้หรือ focus — ชื่อหน้าจะได้ใช้พื้นที่เต็มตอนไม่ได้ทำอะไร แต่ยังกด Tab มาถึงได้ */}
+        <div className="flex w-0 shrink-0 overflow-hidden group-focus-within:w-auto group-hover:w-auto">
+          {onRenamePage && (
+            <button type="button" onClick={() => onRenamePage(node)} aria-label={`เปลี่ยนชื่อ ${node.title}`} className={rowActionClass}>
+              <Pencil size={13} aria-hidden />
+            </button>
+          )}
+          {onDeletePage && (
+            <button type="button" onClick={() => onDeletePage(node)} aria-label={`ลบ ${node.title}`} className={rowActionClass}>
+              <Trash2 size={13} aria-hidden />
+            </button>
+          )}
+          {onCreatePage && (
+            <button type="button" onClick={() => onCreatePage(node.id)} aria-label={`สร้างหน้าย่อยใน ${node.title}`} className={rowActionClass}>
+              <Plus size={13} aria-hidden />
+            </button>
+          )}
+        </div>
       </div>
       {hasChildren && isExpanded && (
         <ul role="group" className="flex flex-col">
@@ -154,6 +184,8 @@ function TreeItem({ node, depth, activeId, expanded, onToggle, onSelect, onCreat
               onToggle={onToggle}
               onSelect={onSelect}
               onCreatePage={onCreatePage}
+              onRenamePage={onRenamePage}
+              onDeletePage={onDeletePage}
             />
           ))}
         </ul>

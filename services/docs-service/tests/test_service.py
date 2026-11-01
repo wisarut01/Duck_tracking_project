@@ -47,6 +47,25 @@ def test_spaces(stub):
     assert code_of(lambda: stub.GetSpace(pb.GetSpaceRequest(key="NOPE"))) == grpc.StatusCode.NOT_FOUND
 
 
+def test_update_space(stub):
+    make_space(stub)
+
+    def update(paths, **fields):
+        mask = FieldMask(paths=paths)
+        return stub.UpdateSpace(pb.UpdateSpaceRequest(key="ENG", space=pb.Space(**fields), update_mask=mask))
+
+    got = update(["name", "description"], name=" Docs ", description="ทีม dev", key="HACK").space
+    assert (got.key, got.name, got.description) == ("ENG", "Docs", "ทีม dev")
+    assert not update(["description"]).space.HasField("description")  # in the mask, not set = null
+    assert update(["description"]).space.name == "Docs"  # name not in the mask
+
+    assert code_of(lambda: update(["name"], name=" ")) == grpc.StatusCode.INVALID_ARGUMENT
+    assert code_of(lambda: update(["key"], key="NEW")) == grpc.StatusCode.INVALID_ARGUMENT
+    assert code_of(lambda: update([])) == grpc.StatusCode.INVALID_ARGUMENT
+    missing = pb.UpdateSpaceRequest(key="NOPE", update_mask=FieldMask(paths=["name"]), space=pb.Space(name="x"))
+    assert code_of(lambda: stub.UpdateSpace(missing)) == grpc.StatusCode.NOT_FOUND
+
+
 def test_create_and_get_page(stub):
     make_space(stub)
     page = make_page(stub, "  Home  ", content="# Hi TB-1")

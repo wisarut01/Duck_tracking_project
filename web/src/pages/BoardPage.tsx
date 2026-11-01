@@ -8,6 +8,7 @@ import {
   useMentionedIssues,
   useMoveIssueMutation,
   useProject,
+  useUpdateProjectMutation,
 } from '@/api/queries';
 import { useToast } from '@/components/ui/Toast';
 import { ProjectBoardScreen } from '@/screens/ProjectBoardScreen';
@@ -28,12 +29,14 @@ export function BoardPage() {
   const linkedPages = useIssueLinks(openIssue?.key);
   useMentionedIssues([openIssue?.description, ...(comments.data ?? []).map((comment) => comment.body)]);
 
-  const issueActions = useIssueActions(openIssue);
+  const issueActions = useIssueActions(openIssue, { onDeleted: () => setParams({}) });
   const move = useMoveIssueMutation(projectKey);
   const createIssue = useCreateIssueMutation(projectKey);
+  const updateProject = useUpdateProjectMutation(projectKey);
 
-  if (project.error) return <ErrorScreen error={project.error} onRetry={() => void project.refetch()} />;
-  if (issues.error) return <ErrorScreen error={issues.error} onRetry={() => void issues.refetch()} />;
+  // error แสดงเฉพาะตอนยังไม่มีข้อมูล: โหลดซ้ำพลาดต้องไม่ปิด drawer ที่กำลังแก้อยู่
+  if (project.error && !project.data) return <ErrorScreen error={project.error} onRetry={() => void project.refetch()} />;
+  if (issues.error && !issues.data) return <ErrorScreen error={issues.error} onRetry={() => void issues.refetch()} />;
   if (!project.data) return <LoadingScreen />;
 
   return (
@@ -55,6 +58,10 @@ export function BoardPage() {
           { onError: (error) => toast({ tone: 'error', title: `ย้าย ${issueKey} ไม่สำเร็จ`, description: errorMessage(error) }) },
         )
       }
+      onUpdateProject={async (changes) => {
+        await updateProject.mutateAsync(changes); // error → ฟอร์มโชว์ข้อความเอง
+        toast({ tone: 'success', title: 'บันทึก project แล้ว' });
+      }}
       onCreateIssue={async (request) => {
         const issue = await createIssue.mutateAsync(request); // error → modal โชว์ข้อความเอง
         toast({ tone: 'success', title: `สร้าง ${issue.key} แล้ว`, description: issue.title });

@@ -49,6 +49,7 @@ export type AuthResponse = Schemas['AuthResponse'];
 
 export type Project = Schemas['Project'];
 export type CreateProjectRequest = Schemas['CreateProjectRequest'];
+export type UpdateProjectRequest = Schemas['UpdateProjectRequest'];
 
 // ---------- Issues ----------
 
@@ -65,6 +66,7 @@ export type MoveIssueRequest = Schemas['MoveIssueRequest'];
 
 export type Comment = Schemas['Comment'];
 export type CreateCommentRequest = Schemas['CreateCommentRequest'];
+export type UpdateCommentRequest = Schemas['UpdateCommentRequest'];
 
 // ---------- Links ----------
 
@@ -74,6 +76,7 @@ export type CreateLinkRequest = Schemas['CreateLinkRequest'];
 
 export type Space = Schemas['Space'];
 export type CreateSpaceRequest = Schemas['CreateSpaceRequest'];
+export type UpdateSpaceRequest = Schemas['UpdateSpaceRequest'];
 export type PageSummary = Schemas['PageSummary'];
 /** โหนดของ page tree — `children` อ้างถึงตัวเอง */
 export type PageTreeNode = Schemas['PageTreeNode'];

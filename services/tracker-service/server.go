@@ -82,6 +82,49 @@ func (s *server) GetProject(ctx context.Context, req *trackerv1.GetProjectReques
 	return &trackerv1.GetProjectResponse{Project: projectProto(project, int32(count))}, nil
 }
 
+func (s *server) UpdateProject(ctx context.Context, req *trackerv1.UpdateProjectRequest) (*trackerv1.UpdateProjectResponse, error) {
+	in := req.GetProject()
+	if in == nil {
+		in = &trackerv1.Project{}
+	}
+	paths := req.GetUpdateMask().GetPaths()
+	if len(paths) == 0 {
+		return nil, invalid("update_mask: must list at least one field")
+	}
+	changes := map[string]any{}
+	for _, path := range paths {
+		switch path {
+		case "name":
+			name := strings.TrimSpace(in.GetName())
+			if name == "" || len([]rune(name)) > 100 {
+				return nil, invalid("name: must be 1 to 100 characters")
+			}
+			changes["name"] = name
+		case "description":
+			changes["description"] = in.Description // not set = null
+		default:
+			return nil, invalid("update_mask: " + path + " cannot be updated")
+		}
+	}
+
+	db := s.db.WithContext(ctx)
+	project, err := findProject(db, req.GetKey())
+	if err != nil {
+		return nil, err
+	}
+	if err := db.Model(&project).Updates(changes).Error; err != nil {
+		return nil, err
+	}
+	if err := db.First(&project, "id = ?", project.ID).Error; err != nil {
+		return nil, err
+	}
+	var count int64
+	if err := db.Model(&Issue{}).Where("project_key = ?", project.Key).Count(&count).Error; err != nil {
+		return nil, err
+	}
+	return &trackerv1.UpdateProjectResponse{Project: projectProto(project, int32(count))}, nil
+}
+
 // ======================= issues =======================
 
 func (s *server) ListIssues(ctx context.Context, req *trackerv1.ListIssuesRequest) (*trackerv1.ListIssuesResponse, error) {
@@ -470,6 +513,60 @@ func (s *server) CreateComment(ctx context.Context, req *trackerv1.CreateComment
 		return nil, err
 	}
 	return &trackerv1.CreateCommentResponse{Comment: commentProto(comment, issue.Key)}, nil
+}
+
+func (s *server) UpdateComment(ctx context.Context, req *trackerv1.UpdateCommentRequest) (*trackerv1.UpdateCommentResponse, error) {
+	body := strings.TrimSpace(req.GetBody())
+	if body == "" || len([]rune(body)) > 5000 {
+		return nil, invalid("body: must be 1 to 5000 characters")
+	}
+	db := s.db.WithContext(ctx)
+	issue, comment, err := findOwnComment(db, req.GetIssueKey(), req.GetId(), req.GetActorId())
+	if err != nil {
+		return nil, err
+	}
+	editedAt := time.Now().UTC()
+	if err := db.Model(&comment).Updates(map[string]any{"body": body, "edited_at": editedAt}).Error; err != nil {
+		return nil, err
+	}
+	comment.Body, comment.EditedAt = body, &editedAt
+	return &trackerv1.UpdateCommentResponse{Comment: commentProto(comment, issue.Key)}, nil
+}
+
+func (s *server) DeleteComment(ctx context.Context, req *trackerv1.DeleteCommentRequest) (*trackerv1.DeleteCommentResponse, error) {
+	db := s.db.WithContext(ctx)
+	_, comment, err := findOwnComment(db, req.GetIssueKey(), req.GetId(), req.GetActorId())
+	if err != nil {
+		return nil, err
+	}
+	if err := db.Delete(&comment).Error; err != nil {
+		return nil, err
+	}
+	return &trackerv1.DeleteCommentResponse{}, nil
+}
+
+// findOwnComment finds a comment of that issue; only its author may change it.
+func findOwnComment(db *gorm.DB, issueKey, id, actorID string) (Issue, Comment, error) {
+	var comment Comment
+	issue, err := findIssue(db, issueKey)
+	if err != nil {
+		return issue, comment, err
+	}
+	notFound := status.Errorf(codes.NotFound, "comment %s not found on issue %s", id, issue.Key)
+	if uuid.Validate(id) != nil {
+		return issue, comment, notFound
+	}
+	err = db.Where("id = ? AND issue_id = ?", id, issue.ID).First(&comment).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return issue, comment, notFound
+	}
+	if err != nil {
+		return issue, comment, err
+	}
+	if comment.AuthorID != actorID {
+		return issue, comment, status.Error(codes.PermissionDenied, "only the author can change this comment")
+	}
+	return issue, comment, nil
 }
 
 // ======================= links =======================

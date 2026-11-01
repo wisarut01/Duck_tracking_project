@@ -1,4 +1,4 @@
-import { useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import { useComments, useIssue, useIssueLinks, useMentionedIssues } from '@/api/queries';
 import { IssueDetailScreen } from '@/screens/IssueDetailScreen';
 import { ErrorScreen, LoadingScreen } from './StatusScreens';
@@ -11,9 +11,13 @@ export function IssuePage() {
   const comments = useComments(issueKey);
   const linkedPages = useIssueLinks(issueKey);
   useMentionedIssues([issue.data?.description, ...(comments.data ?? []).map((comment) => comment.body)]);
-  const actions = useIssueActions(issue.data);
+  const navigate = useNavigate();
+  const actions = useIssueActions(issue.data, {
+    onDeleted: () => navigate(`/projects/${issue.data?.projectKey}/board`, { replace: true }),
+  });
 
-  if (issue.error) return <ErrorScreen error={issue.error} onRetry={() => void issue.refetch()} />;
+  // error แสดงเฉพาะตอนยังไม่มีข้อมูล: โหลดซ้ำพลาดต้องไม่ปิดข้อความที่กำลังแก้อยู่
+  if (issue.error && !issue.data) return <ErrorScreen error={issue.error} onRetry={() => void issue.refetch()} />;
   if (!issue.data) return <LoadingScreen />;
 
   return (

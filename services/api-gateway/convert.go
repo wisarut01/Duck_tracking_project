@@ -66,6 +66,7 @@ type commentJSON struct {
 	Author    *userJSON `json:"author"`
 	Body      string    `json:"body"`
 	CreatedAt string    `json:"createdAt"`
+	EditedAt  *string   `json:"editedAt"`
 }
 
 type spaceJSON struct {
@@ -233,9 +234,14 @@ func (u users) issue(i *trackerv1.Issue) issueJSON {
 
 func (u users) comment(c *trackerv1.Comment) commentJSON {
 	author := c.GetAuthorId()
-	return commentJSON{
+	out := commentJSON{
 		ID: c.GetId(), IssueKey: c.GetIssueKey(), Author: u.get(&author), Body: c.GetBody(), CreatedAt: timeJSON(c.GetCreateTime()),
 	}
+	if c.GetEditTime() != nil {
+		edited := timeJSON(c.GetEditTime())
+		out.EditedAt = &edited
+	}
+	return out
 }
 
 func (u users) page(p *docsv1.Page) pageJSON {

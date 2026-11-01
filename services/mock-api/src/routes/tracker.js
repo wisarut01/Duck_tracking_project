@@ -7,7 +7,7 @@ import {
   db, now, findProject, findIssue, findPage, findUser,
   toProject, toIssue, toIssueSummary, toComment, toPageSummary,
 } from '../db.js';
-import { badRequest, conflict, notFound } from '../errors.js';
+import { badRequest, conflict, forbidden, notFound } from '../errors.js';
 
 export const trackerRoutes = Router();
 
@@ -47,6 +47,14 @@ trackerRoutes.post('/projects', (req, res) => {
 
 trackerRoutes.get('/projects/:projectKey', (req, res) => {
   res.json(toProject(findProject(req.params.projectKey)));
+});
+
+trackerRoutes.patch('/projects/:projectKey', (req, res) => {
+  const project = findProject(req.params.projectKey);
+  for (const field of ['name', 'description']) {
+    if (field in req.body) project[field] = req.body[field];
+  }
+  res.json(toProject(project));
 });
 
 // ---------------- issues ----------------
@@ -198,6 +206,28 @@ trackerRoutes.post('/issues/:issueKey/comments', (req, res) => {
   const comment = { id: randomUUID(), issueId: issue.id, authorId: req.user.id, body: req.body.body, createdAt: now() };
   db.comments.push(comment);
   res.status(201).json(toComment(comment));
+});
+
+// Only the author may change or delete a comment.
+function findOwnComment(req) {
+  const issue = findIssue(req.params.issueKey);
+  const comment = db.comments.find((c) => c.id === req.params.commentId && c.issueId === issue.id);
+  if (!comment) throw notFound(`comment ${req.params.commentId} not found on issue ${issue.key}`);
+  if (comment.authorId !== req.user.id) throw forbidden('only the author can change this comment');
+  return comment;
+}
+
+trackerRoutes.patch('/issues/:issueKey/comments/:commentId', (req, res) => {
+  const comment = findOwnComment(req);
+  comment.body = req.body.body;
+  comment.editedAt = now();
+  res.json(toComment(comment));
+});
+
+trackerRoutes.delete('/issues/:issueKey/comments/:commentId', (req, res) => {
+  const comment = findOwnComment(req);
+  db.comments = db.comments.filter((c) => c.id !== comment.id);
+  res.status(204).end();
 });
 
 // ---------------- issue ↔ page links ----------------

@@ -142,6 +142,25 @@ class DocsService(docs_pb2_grpc.DocsServiceServicer):
 
         return self._run(context, body)
 
+    def UpdateSpace(self, request, context):
+        def body(session: Session):
+            paths = list(request.update_mask.paths)
+            if not paths:
+                raise invalid("update_mask: must list at least one field")
+            space = find_space(session, request.key)
+            new = request.space
+            for path in paths:
+                if path == "name":
+                    space.name = required_text(new.name, "name", 100)
+                elif path == "description":
+                    space.description = new.description if new.HasField("description") else None
+                else:
+                    raise invalid(f"update_mask: {path} cannot be updated")
+            session.flush()
+            return docs_pb2.UpdateSpaceResponse(space=space_proto(space))
+
+        return self._run(context, body)
+
     # ---- pages ----
 
     def GetPageTree(self, request, context):

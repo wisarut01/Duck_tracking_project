@@ -52,6 +52,7 @@ plugins, so you also don't need `protoc`. Generated code goes in `/gen` and isn'
 | `GET /projects` | `tracker.ListProjects` |
 | `POST /projects` | `tracker.CreateProject` (`lead_id` = current user) |
 | `GET /projects/{projectKey}` | `tracker.GetProject` |
+| `PATCH /projects/{projectKey}` | `tracker.UpdateProject` (+ `update_mask`) |
 | `GET /projects/{projectKey}/issues` | `tracker.ListIssues` → hydrate users |
 | `POST /projects/{projectKey}/issues` | `tracker.CreateIssue` (`reporter_id` = current user) → hydrate users |
 | `GET /issues/{issueKey}` | `tracker.GetIssue` → hydrate users |
@@ -60,12 +61,15 @@ plugins, so you also don't need `protoc`. Generated code goes in `/gen` and isn'
 | `POST /issues/{issueKey}/move` | `tracker.MoveIssue` → hydrate users |
 | `GET /issues/{issueKey}/comments` | `tracker.ListComments` → hydrate users |
 | `POST /issues/{issueKey}/comments` | `tracker.CreateComment` (`author_id` = current user) → hydrate users |
+| `PATCH /issues/{issueKey}/comments/{commentId}` | `tracker.UpdateComment` (`actor_id` = current user) → hydrate users |
+| `DELETE /issues/{issueKey}/comments/{commentId}` | `tracker.DeleteComment` (`actor_id` = current user) |
 | `GET /issues/{issueKey}/links` | `tracker.ListIssueLinks` → `docs.BatchGetPages(page_ids)` |
 | `POST /issues/{issueKey}/links` | `docs.GetPage` (404 if the page is missing) → `tracker.CreateIssueLink` → return the PageSummary |
 | `DELETE /issues/{issueKey}/links/{pageId}` | `tracker.DeleteIssueLink` |
 | `GET /spaces` | `docs.ListSpaces` |
 | `POST /spaces` | `docs.CreateSpace` |
 | `GET /spaces/{spaceKey}` | `docs.GetSpace` |
+| `PATCH /spaces/{spaceKey}` | `docs.UpdateSpace` (+ `update_mask`) |
 | `GET /spaces/{spaceKey}/pages` | `docs.GetPageTree` |
 | `POST /spaces/{spaceKey}/pages` | `docs.CreatePage` (`author_id` = current user) → hydrate users |
 | `GET /pages/{pageId}` | `docs.GetPage` → hydrate users |
@@ -86,7 +90,7 @@ The gateway turns a gRPC error into the REST error body `{ "error": { "code", "m
 |---|---|---|---|
 | `INVALID_ARGUMENT` | 400 | `VALIDATION_FAILED` | empty title, page moved under its own child |
 | `UNAUTHENTICATED` | 401 | `UNAUTHENTICATED` | bad password, expired token |
-| `PERMISSION_DENIED` | 403 | `PERMISSION_DENIED` | (no roles in the MVP yet) |
+| `PERMISSION_DENIED` | 403 | `PERMISSION_DENIED` | editing someone else's comment |
 | `NOT_FOUND` | 404 | `NOT_FOUND` | `issue TB-999 not found` |
 | `ALREADY_EXISTS` | 409 | `ALREADY_EXISTS` | duplicate project key, duplicate link |
 | anything else (`INTERNAL`, `UNAVAILABLE`, `DEADLINE_EXCEEDED`, …) | 500 | `INTERNAL` | a service is down. Log the details, don't send them to the client |

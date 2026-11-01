@@ -4,7 +4,7 @@
  * then drives the UI. The web app must be configured to call the same API_BASE_URL.
  */
 import type { Page } from '@playwright/test';
-import { test, expect, expectResponse, createIssue, createPage, uniqueToken } from '../lib/fixtures';
+import { test, expect, expectResponse, createIssue, createPage, newSession, uniqueToken } from '../lib/fixtures';
 
 const WEB_URL = (process.env.WEB_URL ?? 'http://localhost:5173').replace(/\/+$/, '');
 const TOKEN_KEY = 'tb-access-token'; // web/src/api/token.ts
@@ -97,6 +97,240 @@ test.describe('web app (E2E)', () => {
     await page.getByRole('link', { name: new RegExp(issue.key) }).click();
     await expect(page).toHaveURL(new RegExp(`/issues/${issue.key}`));
     await expect(page.getByText(issue.title).first()).toBeVisible();
+  });
+
+  test('TC-DOCS-020 the editor saves by itself, no save button needed', { tag: '@P0' }, async ({ page, session, api, space }) => {
+    const doc = await createPage(api, space.key, { title: 'Spec', contentMd: 'เดิม' });
+    await loginWithToken(page, session.token);
+    await page.goto(`${WEB_URL}/spaces/${space.key}/pages/${doc.id}`);
+
+    await page.getByRole('button', { name: 'แก้ไข', exact: true }).click();
+    await page.getByLabel('ชื่อหน้า').fill('Spec ใหม่');
+    await page.getByLabel('เนื้อหา Markdown').fill('เนื้อหาใหม่');
+    await expect(page.getByText('บันทึกอัตโนมัติแล้ว')).toBeVisible();
+    const saved = await expectResponse<any>(await api.get(`/pages/${doc.id}`), 200, 'Page');
+    expect([saved.title, saved.contentMd]).toEqual(['Spec ใหม่', 'เนื้อหาใหม่']);
+
+    await page.getByRole('button', { name: 'เสร็จสิ้น' }).click();
+    await expect(page.getByText('เนื้อหาใหม่')).toBeVisible();
+    await expect(page.getByLabel('เนื้อหา Markdown')).toBeHidden();
+  });
+
+  test('TC-DOCS-021 switching page right after typing saves to the page you were on', { tag: '@P0' }, async ({ page, session, api, space }) => {
+    const first = await createPage(api, space.key, { title: 'First', contentMd: 'one' });
+    const second = await createPage(api, space.key, { title: 'Second', contentMd: 'two' });
+    await loginWithToken(page, session.token);
+    await page.goto(`${WEB_URL}/spaces/${space.key}/pages/${first.id}`);
+
+    await page.getByRole('button', { name: 'แก้ไข', exact: true }).click();
+    await page.getByLabel('เนื้อหา Markdown').fill('one edited');
+    await page.getByRole('complementary', { name: 'Page tree' }).getByRole('button', { name: 'Second', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(second.id));
+
+    await expect
+      .poll(async () => (await expectResponse<any>(await api.get(`/pages/${first.id}`), 200, 'Page')).contentMd)
+      .toBe('one edited');
+    expect((await expectResponse<any>(await api.get(`/pages/${second.id}`), 200, 'Page')).contentMd).toBe('two');
+  });
+
+  test('TC-DOCS-022 going to another tab saves right away', { tag: '@P0' }, async ({ page, session, api, space }) => {
+    const doc = await createPage(api, space.key, { title: 'Spec', contentMd: 'เดิม' });
+    await loginWithToken(page, session.token);
+    await page.goto(`${WEB_URL}/spaces/${space.key}/pages/${doc.id}`);
+
+    await page.getByRole('button', { name: 'แก้ไข', exact: true }).click();
+    const saving = page.waitForRequest((request) => request.method() === 'PATCH');
+    const started = Date.now();
+    await page.getByLabel('เนื้อหา Markdown').fill('สลับ tab');
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await saving;
+    expect(Date.now() - started).toBeLessThan(900); // ไม่ได้รอ debounce 1 วินาที
+    await expect
+      .poll(async () => (await expectResponse<any>(await api.get(`/pages/${doc.id}`), 200, 'Page')).contentMd)
+      .toBe('สลับ tab');
+  });
+
+  test('TC-DOCS-023 a failed reload on returning to the tab does not close the editor', { tag: '@P0' }, async ({ page, session, api, space }) => {
+    const doc = await createPage(api, space.key, { title: 'Spec', contentMd: 'เดิม' });
+    await loginWithToken(page, session.token);
+    await page.goto(`${WEB_URL}/spaces/${space.key}/pages/${doc.id}`);
+    await page.getByRole('button', { name: 'แก้ไข', exact: true }).click();
+    await page.getByLabel('เนื้อหา Markdown').fill('ยังอยู่ไหม');
+    await expect(page.getByText('บันทึกอัตโนมัติแล้ว')).toBeVisible();
+
+    // server หลับ: ทุก GET ล้มเหลว (เหมือน Render ที่ยังไม่ตื่น)
+    let failed = 0;
+    await page.route(/\/api\/v1\//, (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      failed++;
+      return route.abort();
+    });
+    await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')));
+    await expect.poll(() => failed, { timeout: 15_000 }).toBeGreaterThan(0);
+    await page.waitForTimeout(6_000); // รอ react-query ลองใหม่จนยอมแพ้ (2 ครั้ง)
+    await expect(page.getByLabel('เนื้อหา Markdown')).toHaveValue('ยังอยู่ไหม');
+  });
+
+  test('TC-DOCS-024 text that could not be saved comes back after a reload', { tag: '@P0' }, async ({ page, session, api, space }) => {
+    const doc = await createPage(api, space.key, { title: 'Spec', contentMd: 'เดิม' });
+    await loginWithToken(page, session.token);
+    await page.goto(`${WEB_URL}/spaces/${space.key}/pages/${doc.id}`);
+    await page.getByRole('button', { name: 'แก้ไข', exact: true }).click();
+
+    await page.route(/\/pages\//, (route) => (route.request().method() === 'PATCH' ? route.abort() : route.continue()));
+    await page.getByLabel('เนื้อหา Markdown').fill('ข้อความที่บันทึกไม่ได้');
+    await expect(page.getByText(/บันทึกไม่สำเร็จ/)).toBeVisible();
+    expect((await expectResponse<any>(await api.get(`/pages/${doc.id}`), 200, 'Page')).contentMd).toBe('เดิม');
+
+    await page.unroute(/\/pages\//);
+    await page.reload();
+    // เปิด editor ให้เองพร้อมข้อความเดิม แล้วบันทึกต่อ
+    await expect(page.getByLabel('เนื้อหา Markdown')).toHaveValue('ข้อความที่บันทึกไม่ได้');
+    await expect
+      .poll(async () => (await expectResponse<any>(await api.get(`/pages/${doc.id}`), 200, 'Page')).contentMd)
+      .toBe('ข้อความที่บันทึกไม่ได้');
+  });
+
+  test('TC-DOCS-025 an old draft never overwrites a newer page without asking', { tag: '@P1' }, async ({ page, session, api, space }) => {
+    const doc = await createPage(api, space.key, { title: 'Spec', contentMd: 'ของใหม่จากเครื่องอื่น' });
+    await loginWithToken(page, session.token);
+    await page.evaluate(
+      ([key, value]) => localStorage.setItem(key, value),
+      [`tb-page-draft:${doc.id}`, JSON.stringify({ title: 'Spec', contentMd: 'ฉบับร่างเก่า', baseUpdatedAt: '2020-01-01T00:00:00.000Z' })] as const,
+    );
+    await page.goto(`${WEB_URL}/spaces/${space.key}/pages/${doc.id}`);
+
+    await expect(page.getByRole('alert').filter({ hasText: 'มีฉบับร่าง' })).toBeVisible();
+    await expect(page.getByLabel('เนื้อหา Markdown')).toHaveValue('ของใหม่จากเครื่องอื่น');
+    await page.waitForTimeout(1_500);
+    expect((await expectResponse<any>(await api.get(`/pages/${doc.id}`), 200, 'Page')).contentMd).toBe('ของใหม่จากเครื่องอื่น');
+
+    await page.getByRole('button', { name: 'ใช้ฉบับร่าง' }).click();
+    await expect(page.getByLabel('เนื้อหา Markdown')).toHaveValue('ฉบับร่างเก่า');
+    await expect
+      .poll(async () => (await expectResponse<any>(await api.get(`/pages/${doc.id}`), 200, 'Page')).contentMd)
+      .toBe('ฉบับร่างเก่า');
+  });
+
+  test('TC-DOCS-026 rename a space and a page, delete a page with its children', { tag: '@P0' }, async ({ page, session, api, space }) => {
+    const root = await createPage(api, space.key, { title: 'Root' });
+    await createPage(api, space.key, { title: 'Child', parentId: root.id });
+    const other = await createPage(api, space.key, { title: 'Other' });
+    await loginWithToken(page, session.token);
+    await page.goto(`${WEB_URL}/spaces/${space.key}/pages/${root.id}`);
+    const tree = page.getByRole('complementary', { name: 'Page tree' });
+
+    await tree.getByRole('button', { name: `แก้ไข ${space.name}` }).click();
+    await page.getByRole('dialog').getByLabel('ชื่อ space').fill('Space ใหม่');
+    await page.getByRole('dialog').getByRole('button', { name: 'บันทึก' }).click();
+    // ระบุ key ด้วย เพราะ DB ที่ใช้ซ้ำอาจมี space ชื่อนี้จากการรันครั้งก่อน
+    await expect(page.getByRole('navigation', { name: 'เมนูหลัก' }).getByRole('link', { name: `Space ใหม่ ${space.key}` })).toBeVisible();
+
+    await page.getByRole('button', { name: 'เปลี่ยนชื่อ', exact: true }).click();
+    await page.getByRole('dialog').getByLabel('ชื่อหน้า').fill('Root ใหม่');
+    await page.getByRole('dialog').getByRole('button', { name: 'บันทึก' }).click();
+    await expect(tree.getByRole('button', { name: 'Root ใหม่', exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'ลบหน้านี้' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'ลบหน้า' }).click();
+    await expect(page).toHaveURL(new RegExp(other.id));
+    await expect(tree.getByRole('treeitem')).toHaveCount(1);
+  });
+
+  test('TC-ISSUE-022 edit title, description and labels, then delete the issue', { tag: '@P0' }, async ({ page, session, api, project }) => {
+    const issue = await createIssue(api, project.key, { title: 'ชื่อเดิม', description: 'คำอธิบายเดิม', labels: [] });
+    await loginWithToken(page, session.token);
+    await page.goto(`${WEB_URL}/issues/${issue.key}`);
+    const get = async () => expectResponse<any>(await api.get(`/issues/${issue.key}`), 200, 'Issue');
+
+    await page.getByRole('button', { name: 'แก้ไขชื่อ issue' }).click();
+    await page.getByLabel('ชื่อ issue').fill('ชื่อใหม่');
+    await page.getByLabel('ชื่อ issue').press('Enter');
+    await expect(page.getByRole('heading', { name: 'ชื่อใหม่' })).toBeVisible();
+
+    await page.getByRole('region', { name: 'Description' }).getByRole('button', { name: 'แก้ไข' }).click();
+    await page.getByLabel('คำอธิบาย').fill('คำอธิบายใหม่');
+    await page.getByRole('region', { name: 'Description' }).getByRole('button', { name: 'บันทึก' }).click();
+    await expect(page.getByText('คำอธิบายใหม่')).toBeVisible();
+
+    await page.getByLabel('เพิ่ม label').fill('backend');
+    await page.getByLabel('เพิ่ม label').press('Enter');
+    await expect.poll(async () => (await get()).labels).toEqual(['backend']);
+    const fresh = await get();
+    expect([fresh.title, fresh.description]).toEqual(['ชื่อใหม่', 'คำอธิบายใหม่']);
+    await page.getByRole('button', { name: 'ลบ backend' }).click();
+    await expect.poll(async () => (await get()).labels).toEqual([]);
+
+    await page.getByRole('button', { name: 'ลบ issue' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'ลบ issue' }).click();
+    await expect(page).toHaveURL(new RegExp(`/projects/${project.key}/board`));
+    expect((await api.get(`/issues/${issue.key}`)).status()).toBe(404);
+  });
+
+  test('TC-ISSUE-023 closing the drawer keeps a description you were still writing', { tag: '@P1' }, async ({ page, session, api, project }) => {
+    const issue = await createIssue(api, project.key);
+    await loginWithToken(page, session.token);
+    await page.goto(`${WEB_URL}/projects/${project.key}/board?issue=${issue.key}`);
+
+    await page.getByRole('region', { name: 'Description' }).getByRole('button', { name: 'แก้ไข' }).click();
+    await page.getByLabel('คำอธิบาย').fill('ยังเขียนไม่จบ');
+    await page.getByRole('button', { name: 'ปิด', exact: true }).click();
+    await expect
+      .poll(async () => (await expectResponse<any>(await api.get(`/issues/${issue.key}`), 200, 'Issue')).description)
+      .toBe('ยังเขียนไม่จบ');
+  });
+
+  test('TC-COMMENT-012 edit and delete your own comment; not other people', { tag: '@P0' }, async ({ page, session, api, anon, project }) => {
+    const issue = await createIssue(api, project.key);
+    const other = await newSession(anon);
+    await anon.withToken(other.token).post(`/issues/${issue.key}/comments`, { body: 'ของคนอื่น' });
+    await api.post(`/issues/${issue.key}/comments`, { body: 'ของฉัน' });
+    await loginWithToken(page, session.token);
+    await page.goto(`${WEB_URL}/issues/${issue.key}`);
+    await expect(page.getByText('ของฉัน')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'แก้ไข comment' })).toHaveCount(1); // เฉพาะ comment ของตัวเอง
+
+    await page.getByRole('button', { name: 'แก้ไข comment' }).click();
+    await page.getByLabel('แก้ไข comment').fill('แก้แล้ว');
+    await page.getByRole('region', { name: 'Comments' }).getByRole('button', { name: 'บันทึก' }).click();
+    await expect(page.getByText('แก้แล้ว')).toBeVisible();
+    await expect(page.getByText('(แก้ไขแล้ว)')).toBeVisible();
+
+    await page.getByRole('button', { name: 'ลบ comment' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'ลบ comment' }).click();
+    await expect(page.getByText('แก้แล้ว')).toBeHidden();
+    await expect(page.getByText('ของคนอื่น')).toBeVisible();
+  });
+
+  test('TC-COMMENT-013 a 403 on a comment keeps you signed in and keeps your text', { tag: '@P1' }, async ({ page, session, api, project }) => {
+    const issue = await createIssue(api, project.key);
+    await api.post(`/issues/${issue.key}/comments`, { body: 'ของฉัน' });
+    await loginWithToken(page, session.token);
+    await page.goto(`${WEB_URL}/issues/${issue.key}`);
+
+    await page.route(/\/comments\//, (route) =>
+      route.request().method() === 'PATCH'
+        ? route.fulfill({ status: 403, json: { error: { code: 'PERMISSION_DENIED', message: 'only the author can change this comment' } } })
+        : route.continue(),
+    );
+    await page.getByRole('button', { name: 'แก้ไข comment' }).click();
+    await page.getByLabel('แก้ไข comment').fill('แก้ไม่ได้');
+    await page.getByRole('region', { name: 'Comments' }).getByRole('button', { name: 'บันทึก' }).click();
+    await expect(page.getByRole('alert').filter({ hasText: 'only the author' })).toBeVisible();
+    await expect(page.getByLabel('แก้ไข comment')).toHaveValue('แก้ไม่ได้');
+    await expect(page).not.toHaveURL(/\/login/);
+  });
+
+  test('TC-BOARD-011 rename a project from its board', { tag: '@P1' }, async ({ page, session, project }) => {
+    await loginWithToken(page, session.token);
+    await page.goto(`${WEB_URL}/projects/${project.key}/board`);
+    await page.getByRole('button', { name: 'แก้ไข project' }).click();
+    await page.getByRole('dialog').getByLabel('ชื่อ project').fill('Project ใหม่');
+    await page.getByRole('dialog').getByRole('button', { name: 'บันทึก' }).click();
+    await expect(page.getByRole('heading', { name: 'Project ใหม่' })).toBeVisible();
   });
 
   test('TC-SEARCH-009 search page shows issues and pages and links to them', { tag: '@P1' }, async ({ page, session, api, project, space }) => {

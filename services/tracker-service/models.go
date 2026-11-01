@@ -48,6 +48,7 @@ type Comment struct {
 	AuthorID  string `gorm:"type:uuid;not null"`
 	Body      string `gorm:"not null"`
 	CreatedAt time.Time
+	EditedAt  *time.Time // nil = never edited
 }
 
 // IssuePageLink is one issue ↔ page link. It is read from both sides.
@@ -119,7 +120,11 @@ func issueProto(i Issue, linkedPageCount int32) *trackerv1.Issue {
 }
 
 func commentProto(c Comment, issueKey string) *trackerv1.Comment {
-	return &trackerv1.Comment{
+	proto := &trackerv1.Comment{
 		Id: c.ID, IssueKey: issueKey, AuthorId: c.AuthorID, Body: c.Body, CreateTime: timestamppb.New(c.CreatedAt),
 	}
+	if c.EditedAt != nil {
+		proto.EditTime = timestamppb.New(*c.EditedAt)
+	}
+	return proto
 }

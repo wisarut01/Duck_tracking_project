@@ -99,6 +99,7 @@ export function toComment(c) {
     author: toUser(findUser(c.authorId)),
     body: c.body,
     createdAt: c.createdAt,
+    editedAt: c.editedAt ?? null,
   };
 }
 

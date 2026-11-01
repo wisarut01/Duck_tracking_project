@@ -25,6 +25,14 @@ docsRoutes.get('/spaces/:spaceKey', (req, res) => {
   res.json(toSpace(findSpace(req.params.spaceKey)));
 });
 
+docsRoutes.patch('/spaces/:spaceKey', (req, res) => {
+  const space = findSpace(req.params.spaceKey);
+  for (const field of ['name', 'description']) {
+    if (field in req.body) space[field] = req.body[field];
+  }
+  res.json(toSpace(space));
+});
+
 // ---------------- page tree ----------------
 
 // Turn the flat list of pages into a nested tree:

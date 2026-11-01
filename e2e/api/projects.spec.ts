@@ -13,6 +13,16 @@ test.describe('projects', () => {
     expect(p.leadId).toBe(session.user.id);
   });
 
+  test('TC-PROJ-010 patch renames a project, clears its description, key stays', { tag: '@P0' }, async ({ api, project }) => {
+    const renamed = await expectResponse<any>(await api.patch(`/projects/${project.key}`, { name: ' New name ', description: null }), 200, 'Project');
+    expect(renamed.key).toBe(project.key);
+    expect(renamed.name).toBe('New name');
+    expect(renamed.description).toBeNull();
+    await expectError(await api.patch(`/projects/${project.key}`, { name: ' ' }), 400, 'VALIDATION_FAILED');
+    await expectError(await api.patch(`/projects/${project.key}`, {}), 400, 'VALIDATION_FAILED');
+    await expectError(await api.patch('/projects/NOPE999', { name: 'x' }), 404, 'NOT_FOUND');
+  });
+
   test('TC-PROJ-002 get project by key', { tag: '@P0' }, async ({ api, project }) => {
     const p = await expectResponse<any>(await api.get(`/projects/${project.key}`), 200, 'Project');
     expect(p.id).toBe(project.id);

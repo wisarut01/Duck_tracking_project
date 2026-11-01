@@ -1,6 +1,6 @@
 # Project Status — Tracking Board
 
-> อัปเดตล่าสุด: 2026-10-25
+> อัปเดตล่าสุด: 2026-10-31
 
 ## ภาพรวม
 
@@ -111,6 +111,18 @@
   - โหมด mock (`make up-mock`, `API_BASE_URL=…:4010`): API + E2E 116/116
   - `web`: `check:api` และ `tsc` ผ่าน; `e2e`: `tsc` ผ่าน
 - **ข้อควรรู้:** สลับระหว่าง `make up` กับ `make up-mock` ให้ `make down` ก่อน ไม่งั้น container ของอีกโหมดจะค้างอยู่
+
+### Autosave และแก้ไขได้ทุกอย่าง (2026-10-31)
+- **Autosave หน้า Docs:** หยุดพิมพ์ 1 วินาที, สลับ tab, เปลี่ยนหน้า หรือปิด editor → บันทึกเอง (`usePageAutosave`)
+  - ระหว่างที่ยังไม่ได้บันทึกเก็บฉบับร่างใน localStorage; บันทึกไม่สำเร็จ → ลองใหม่ทุก 5 วินาที, เปิดหน้าอีกครั้ง → กู้คืน
+  - ฉบับร่างเก่ากว่าหน้าบน server → ถามก่อน ไม่เขียนทับเอง
+  - แก้สาเหตุข้อความหาย: refetch ที่ล้มเหลว (เช่นกลับมาที่ tab ตอน Render หลับ) เคยเปลี่ยนทั้งหน้าเป็น error แล้วปิด editor
+- **แก้ไขได้หลังสร้าง:** ชื่อ / คำอธิบาย / label ของ issue, ลบ issue, ลบหน้า, แก้และลบ comment (เฉพาะคนเขียน, ขึ้น "แก้ไขแล้ว")
+- **เปลี่ยนชื่อ:** หน้า, space, project (key ยังเปลี่ยนไม่ได้)
+- **API ใหม่:** `PATCH /projects/{key}`, `PATCH /spaces/{key}`, `PATCH` และ `DELETE /issues/{key}/comments/{id}`; `Comment.editedAt`
+- **ตอน deploy:** tracker-service เพิ่มคอลัมน์ `comments.edited_at` (nullable) เองด้วย AutoMigrate
+- **ผลทดสอบ (2026-11-01, กับ `make up`):** Playwright **136/136**; Go `go vet` และ unit test ผ่าน (รวม DB test กับ Postgres จริง); docs-service pytest 12 ผ่าน, 1 ข้าม; `ruff`, `redocly lint`, `check:api`, `tsc`, `build`, `build-storybook` ผ่าน
+- **ข้อจำกัด:** ถ้าเปิดแก้หน้าเดียวกันพร้อมกันสองเครื่อง ใครบันทึกทีหลังจะทับ (ยังไม่มี realtime); ลบ space / project ยังไม่มี
 
 ## วิธีรัน
 

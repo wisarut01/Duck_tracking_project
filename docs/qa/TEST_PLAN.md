@@ -162,6 +162,12 @@ Test data: ทุก test สร้าง user / project / space ของตั
 | TC-COMMENT-005 | P2 | **When** body > 5000 ตัวอักษร **Then** 400 | API |
 | TC-COMMENT-006 | P2 | **When** comment ใน issue ที่ไม่มี **Then** 404 | API |
 | TC-COMMENT-007 | P2 | **When** body มีแต่ช่องว่าง/ขึ้นบรรทัด **Then** 400 `VALIDATION_FAILED` | API |
+| TC-COMMENT-008 | P0 | **When** `PATCH` comment ของตัวเอง **Then** 200, body ถูก trim, `editedAt` มีค่า, `createdAt` เท่าเดิม | API |
+| TC-COMMENT-009 | P0 | **When** `DELETE` comment ของตัวเอง **Then** 204, ลบซ้ำได้ 404 | API |
+| TC-COMMENT-010 | P0 | **When** แก้/ลบ comment ของคนอื่น **Then** 403 `PERMISSION_DENIED`, ข้อความเท่าเดิม | API |
+| TC-COMMENT-011 | P1 | **When** body ว่าง/ยาวเกิน, id ไม่ใช่ UUID **Then** 400; comment อยู่คนละ issue **Then** 404 | API |
+| TC-COMMENT-012 | P0 | **When** แก้และลบ comment ในหน้าเว็บ **Then** ขึ้น "(แก้ไขแล้ว)" และหายไปหลังลบ; comment ของคนอื่นไม่มีปุ่ม | E2E |
+| TC-COMMENT-013 | P1 | **Given** แก้ comment แล้วได้ 403 **Then** ยังไม่ถูก logout และข้อความที่แก้ยังอยู่ | E2E |
 
 ### 7.6 Docs — space & page tree (`e2e/api/docs.spec.ts`)
 
@@ -173,6 +179,18 @@ Test data: ทุก test สร้าง user / project / space ของตั
 | TC-SPACE-004 | P1 | **When** key ซ้ำ **Then** 409 | API |
 | TC-SPACE-005 | P1 | **When** space ที่ไม่มี **Then** 404 | API |
 | TC-SPACE-006 | P2 | **Given** space ใหม่ **Then** page tree = `[]` | API |
+| TC-SPACE-007 | P0 | **When** `PATCH /spaces/{key}` **Then** ชื่อ/คำอธิบายเปลี่ยน, key และหน้าเดิมอยู่ครบ; ชื่อว่างหรือ body ว่าง 400; ไม่มี space 404 | API |
+| TC-PROJ-010 | P0 | **When** `PATCH /projects/{key}` **Then** ชื่อเปลี่ยน, ล้างคำอธิบายได้, key เดิม; ชื่อว่างหรือ body ว่าง 400; ไม่มี project 404 | API |
+| TC-DOCS-020 | P0 | **When** พิมพ์ใน editor **Then** บันทึกเองโดยไม่ต้องกดปุ่ม | E2E |
+| TC-DOCS-021 | P0 | **When** พิมพ์แล้วเปลี่ยนหน้าทันที **Then** บันทึกลงหน้าเดิม ไม่ปนหน้าใหม่ | E2E |
+| TC-DOCS-022 | P0 | **When** สลับไป tab อื่น **Then** บันทึกทันที ไม่รอ debounce | E2E |
+| TC-DOCS-023 | P0 | **Given** โหลดซ้ำล้มเหลวตอนกลับมาที่ tab **Then** editor ยังเปิดและข้อความอยู่ครบ | E2E |
+| TC-DOCS-024 | P0 | **Given** บันทึกไม่สำเร็จ **When** reload **Then** เปิด editor พร้อมข้อความเดิมแล้วบันทึกต่อ | E2E |
+| TC-DOCS-025 | P1 | **Given** ฉบับร่างเก่ากว่าหน้าบน server **Then** ถามก่อน ไม่เขียนทับเอง | E2E |
+| TC-DOCS-026 | P0 | **When** เปลี่ยนชื่อ space, เปลี่ยนชื่อหน้า, ลบหน้าที่มีหน้าย่อย **Then** ทุกอย่างอัปเดตและพาไปหน้าที่เหลือ | E2E |
+| TC-ISSUE-022 | P0 | **When** แก้ชื่อ, คำอธิบาย, label แล้วลบ issue **Then** บันทึกครบ, ลบแล้วกลับ board และ API ตอบ 404 | E2E |
+| TC-ISSUE-023 | P1 | **When** ปิด drawer ระหว่างเขียนคำอธิบาย **Then** ข้อความถูกบันทึก | E2E |
+| TC-BOARD-011 | P1 | **When** เปลี่ยนชื่อ project จากหน้า board **Then** หัวข้อเปลี่ยน | E2E |
 | TC-PAGE-001 | P0 | **When** สร้างหน้า `parentId: null` **Then** 201 `Page`, `parentId` = null, author = ผู้สร้าง | API |
 | TC-PAGE-002 | P0 | **Given** Root → Child → Grandchild + Root2 **When** `GET /spaces/{key}/pages` **Then** top level มีแค่ Root, Root2; Child อยู่ใน `Root.children`, Grandchild อยู่ใน `Child.children`, leaf มี `children: []` | API |
 | TC-PAGE-003 | P0 | **When** get page **Then** `contentMd` ตรงทุกตัวอักษร (heading, list, code block) | API |

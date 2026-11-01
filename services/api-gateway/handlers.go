@@ -26,6 +26,7 @@ func (g *gateway) routes(api fiber.Router) {
 	api.Get("/projects", g.listProjects)
 	api.Post("/projects", g.createProject)
 	api.Get("/projects/:projectKey", g.getProject)
+	api.Patch("/projects/:projectKey", g.updateProject)
 	api.Get("/projects/:projectKey/issues", g.listIssues)
 	api.Post("/projects/:projectKey/issues", g.createIssue)
 
@@ -35,6 +36,8 @@ func (g *gateway) routes(api fiber.Router) {
 	api.Post("/issues/:issueKey/move", g.moveIssue)
 	api.Get("/issues/:issueKey/comments", g.listComments)
 	api.Post("/issues/:issueKey/comments", g.createComment)
+	api.Patch("/issues/:issueKey/comments/:commentId", g.updateComment)
+	api.Delete("/issues/:issueKey/comments/:commentId", g.deleteComment)
 	api.Get("/issues/:issueKey/links", g.listIssueLinks)
 	api.Post("/issues/:issueKey/links", g.createIssueLink)
 	api.Delete("/issues/:issueKey/links/:pageId", g.deleteIssueLink)
@@ -42,6 +45,7 @@ func (g *gateway) routes(api fiber.Router) {
 	api.Get("/spaces", g.listSpaces)
 	api.Post("/spaces", g.createSpace)
 	api.Get("/spaces/:spaceKey", g.getSpace)
+	api.Patch("/spaces/:spaceKey", g.updateSpace)
 	api.Get("/spaces/:spaceKey/pages", g.getPageTree)
 	api.Post("/spaces/:spaceKey/pages", g.createPage)
 	api.Get("/pages/:pageId", g.getPage)
@@ -183,6 +187,30 @@ func (g *gateway) createProject(c fiber.Ctx) error {
 
 func (g *gateway) getProject(c fiber.Ctx) error {
 	resp, err := g.tracker.GetProject(c.Context(), &trackerv1.GetProjectRequest{Key: c.Params("projectKey")})
+	if err != nil {
+		return err
+	}
+	return c.JSON(toProject(resp.GetProject()))
+}
+
+func (g *gateway) updateProject(c fiber.Ctx) error {
+	mask, err := updateMask(c, map[string]string{"name": "name", "description": "description"})
+	if err != nil {
+		return err
+	}
+	var body struct {
+		Name        string
+		Description *string
+	}
+	if err := decode(c, &body); err != nil {
+		return err
+	}
+	trim(&body.Name)
+	resp, err := g.tracker.UpdateProject(c.Context(), &trackerv1.UpdateProjectRequest{
+		Key:        c.Params("projectKey"),
+		Project:    &trackerv1.Project{Name: body.Name, Description: body.Description},
+		UpdateMask: mask,
+	})
 	if err != nil {
 		return err
 	}
@@ -368,6 +396,35 @@ func (g *gateway) createComment(c fiber.Ctx) error {
 	return c.Status(http.StatusCreated).JSON(found.comment(resp.GetComment()))
 }
 
+func (g *gateway) updateComment(c fiber.Ctx) error {
+	var body struct{ Body string }
+	if err := decode(c, &body); err != nil {
+		return err
+	}
+	trim(&body.Body)
+	resp, err := g.tracker.UpdateComment(c.Context(), &trackerv1.UpdateCommentRequest{
+		IssueKey: c.Params("issueKey"), Id: c.Params("commentId"), ActorId: currentUser(c).GetId(), Body: body.Body,
+	})
+	if err != nil {
+		return err
+	}
+	found, err := g.loadUsers(c.Context(), resp.GetComment().GetAuthorId())
+	if err != nil {
+		return err
+	}
+	return c.JSON(found.comment(resp.GetComment()))
+}
+
+func (g *gateway) deleteComment(c fiber.Ctx) error {
+	_, err := g.tracker.DeleteComment(c.Context(), &trackerv1.DeleteCommentRequest{
+		IssueKey: c.Params("issueKey"), Id: c.Params("commentId"), ActorId: currentUser(c).GetId(),
+	})
+	if err != nil {
+		return err
+	}
+	return c.SendStatus(http.StatusNoContent)
+}
+
 // ======================= issue ↔ page links =======================
 // tracker-service owns the links (page ids only); docs-service has the pages.
 
@@ -470,6 +527,30 @@ func (g *gateway) createSpace(c fiber.Ctx) error {
 
 func (g *gateway) getSpace(c fiber.Ctx) error {
 	resp, err := g.docs.GetSpace(c.Context(), &docsv1.GetSpaceRequest{Key: c.Params("spaceKey")})
+	if err != nil {
+		return err
+	}
+	return c.JSON(toSpace(resp.GetSpace()))
+}
+
+func (g *gateway) updateSpace(c fiber.Ctx) error {
+	mask, err := updateMask(c, map[string]string{"name": "name", "description": "description"})
+	if err != nil {
+		return err
+	}
+	var body struct {
+		Name        string
+		Description *string
+	}
+	if err := decode(c, &body); err != nil {
+		return err
+	}
+	trim(&body.Name)
+	resp, err := g.docs.UpdateSpace(c.Context(), &docsv1.UpdateSpaceRequest{
+		Key:        c.Params("spaceKey"),
+		Space:      &docsv1.Space{Name: body.Name, Description: body.Description},
+		UpdateMask: mask,
+	})
 	if err != nil {
 		return err
 	}

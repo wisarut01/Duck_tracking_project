@@ -61,7 +61,12 @@ export async function unwrap<T>(
   // token หมดอายุ / ไม่ถูกต้อง → ล้าง session แล้ว RequireAuth จะพาไปหน้า login เอง
   if (response.status === 401) clearSession();
   // login ด้วย Google ได้ แต่อีเมลไม่อยู่ใน allowlist → ออกจากระบบพร้อมบอกเหตุผลที่หน้า login
-  if (response.status === 403 && body?.error?.code === "PERMISSION_DENIED")
+  // (ยกเว้นแก้/ลบ comment ของคนอื่น ซึ่งก็ได้ 403 เหมือนกัน แต่ session ยังใช้ได้)
+  if (
+    response.status === 403 &&
+    body?.error?.code === "PERMISSION_DENIED" &&
+    !/\/comments\/[^/]+$/.test(new URL(response.url).pathname)
+  )
     clearSession(body.error.message);
   throw new ApiRequestError(
     response.status,

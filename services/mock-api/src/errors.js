@@ -17,6 +17,7 @@ export class ApiError extends Error {
 export const badRequest = (msg) => new ApiError(400, 'VALIDATION_FAILED', msg);
 export const unauthenticated = (msg = 'invalid or expired token') =>
   new ApiError(401, 'UNAUTHENTICATED', msg);
+export const forbidden = (msg) => new ApiError(403, 'PERMISSION_DENIED', msg);
 export const notFound = (msg) => new ApiError(404, 'NOT_FOUND', msg);
 export const conflict = (msg) => new ApiError(409, 'ALREADY_EXISTS', msg);
 

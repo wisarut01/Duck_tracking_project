@@ -293,6 +293,73 @@ func TestCommentsAndLinks(t *testing.T) {
 	}
 }
 
+func TestUpdateProject(t *testing.T) {
+	s := newTestServer(t)
+	createIssue(t, s, "a") // creates project TB
+	update := func(project *trackerv1.Project, paths ...string) (*trackerv1.UpdateProjectResponse, error) {
+		return s.UpdateProject(ctx, &trackerv1.UpdateProjectRequest{Key: "TB", Project: project, UpdateMask: &fieldmaskpb.FieldMask{Paths: paths}})
+	}
+	description := "ทีม dev"
+	got, err := update(&trackerv1.Project{Name: " Renamed ", Description: &description, Key: "HACK"}, "name", "description")
+	if err != nil || got.Project.Key != "TB" || got.Project.Name != "Renamed" || got.Project.GetDescription() != description || got.Project.IssueCount != 1 {
+		t.Fatalf("update = %v, %v", got, err)
+	}
+	if got, err = update(&trackerv1.Project{}, "description"); err != nil || got.Project.Description != nil || got.Project.Name != "Renamed" {
+		t.Fatalf("clear description = %v, %v", got, err)
+	}
+	_, err = update(&trackerv1.Project{Name: " "}, "name")
+	wantCode(t, err, codes.InvalidArgument)
+	_, err = update(&trackerv1.Project{Key: "NEW"}, "key")
+	wantCode(t, err, codes.InvalidArgument)
+	_, err = update(&trackerv1.Project{})
+	wantCode(t, err, codes.InvalidArgument)
+}
+
+func TestUpdateAndDeleteComment(t *testing.T) {
+	s := newTestServer(t)
+	a := createIssue(t, s, "a")
+	b := createIssue(t, s, "b")
+	created, err := s.CreateComment(ctx, &trackerv1.CreateCommentRequest{IssueKey: a.Key, AuthorId: userB, Body: "first"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := created.Comment.Id
+	if created.Comment.EditTime != nil {
+		t.Errorf("new comment has edit_time %v", created.Comment.EditTime)
+	}
+
+	update := func(issueKey, commentID, actor, body string) (*trackerv1.UpdateCommentResponse, error) {
+		return s.UpdateComment(ctx, &trackerv1.UpdateCommentRequest{IssueKey: issueKey, Id: commentID, ActorId: actor, Body: body})
+	}
+	got, err := update(a.Key, id, userB, " edited ")
+	if err != nil || got.Comment.Body != "edited" || got.Comment.EditTime == nil {
+		t.Fatalf("update = %v, %v", got, err)
+	}
+	listed, _ := s.ListComments(ctx, &trackerv1.ListCommentsRequest{IssueKey: a.Key})
+	if listed.Comments[0].Body != "edited" || listed.Comments[0].EditTime == nil {
+		t.Errorf("after update, list = %v", listed.Comments)
+	}
+
+	_, err = update(a.Key, id, userA, "not mine")
+	wantCode(t, err, codes.PermissionDenied)
+	_, err = update(a.Key, id, userB, " ")
+	wantCode(t, err, codes.InvalidArgument)
+	_, err = update(b.Key, id, userB, "wrong issue")
+	wantCode(t, err, codes.NotFound)
+	_, err = update(a.Key, "not-a-uuid", userB, "x")
+	wantCode(t, err, codes.NotFound)
+
+	remove := func(actor string) error {
+		_, err := s.DeleteComment(ctx, &trackerv1.DeleteCommentRequest{IssueKey: a.Key, Id: id, ActorId: actor})
+		return err
+	}
+	wantCode(t, remove(userA), codes.PermissionDenied)
+	if err := remove(userB); err != nil {
+		t.Fatal(err)
+	}
+	wantCode(t, remove(userB), codes.NotFound)
+}
+
 func TestSearchIssues(t *testing.T) {
 	s := newTestServer(t)
 	createIssue(t, s, "Fix login page")

@@ -2,6 +2,7 @@ import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router'
 import { errorMessage } from '@/api/client';
 import {
   useCreatePageMutation,
+  useDeletePageMutation,
   useLinkMutation,
   useMentionedIssues,
   usePage,
@@ -10,7 +11,9 @@ import {
   useSpace,
   useUnlinkMutation,
   useUpdatePageMutation,
+  useUpdateSpaceMutation,
 } from '@/api/queries';
+import { findAncestorIds } from '@/components/docs/PageTree';
 import { useToast } from '@/components/ui/Toast';
 import { DocsPageScreen } from '@/screens/DocsPageScreen';
 import { ErrorScreen, LoadingScreen } from './StatusScreens';
@@ -32,14 +35,18 @@ export function DocsPage() {
   useMentionedIssues([page.data?.contentMd]);
 
   const createPage = useCreatePageMutation(spaceKey);
-  const updatePage = useUpdatePageMutation(pageId ?? '');
+  const updatePage = useUpdatePageMutation();
+  const deletePage = useDeletePageMutation(spaceKey);
+  const updateSpace = useUpdateSpaceMutation(spaceKey);
   const link = useLinkMutation();
   const unlink = useUnlinkMutation();
 
   const pageUrl = (id: string) => `/spaces/${spaceKey}/pages/${id}`;
 
-  if (space.error) return <ErrorScreen error={space.error} onRetry={() => void space.refetch()} />;
-  if (page.error) return <ErrorScreen error={page.error} onRetry={() => void page.refetch()} />;
+  // error แสดงเฉพาะตอนยังไม่มีข้อมูล: โหลดซ้ำพลาด (เช่นตอนกลับมาที่ tab แล้ว server ยังไม่ตื่น) ต้องไม่ปิด editor ที่เปิดอยู่
+  if (space.error && !space.data) return <ErrorScreen error={space.error} onRetry={() => void space.refetch()} />;
+  if (tree.error && !tree.data) return <ErrorScreen error={tree.error} onRetry={() => void tree.refetch()} />;
+  if (page.error && !page.data) return <ErrorScreen error={page.error} onRetry={() => void page.refetch()} />;
   if (!space.data || !tree.data) return <LoadingScreen />;
 
   const firstPage = tree.data[0];
@@ -65,15 +72,27 @@ export function DocsPage() {
           },
         )
       }
-      onSavePage={async (changes) => {
-        try {
-          await updatePage.mutateAsync(changes);
-        } catch (error) {
-          toast({ tone: 'error', title: 'บันทึกไม่สำเร็จ', description: errorMessage(error) });
-          throw error; // ให้ editor เปิดค้างไว้
-        }
-        toast({ tone: 'success', title: 'บันทึกหน้าแล้ว' });
+      onSavePage={(changes) => updatePage.mutateAsync({ pageId: pageId!, changes })}
+      onBackgroundSaveError={(error) =>
+        toast({ tone: 'error', title: 'บันทึกหน้าไม่สำเร็จ', description: `ข้อความเก็บไว้ในเครื่องแล้ว เปิดหน้านี้อีกครั้งเพื่อบันทึกต่อ (${errorMessage(error)})` })
+      }
+      onFinishEditing={() => {
         if (params.has('edit')) navigate(pageUrl(pageId!), { replace: true });
+      }}
+      onRenamePage={async (id, title) => {
+        await updatePage.mutateAsync({ pageId: id, changes: { title } }); // error → ฟอร์มโชว์ข้อความเอง
+        toast({ tone: 'success', title: `เปลี่ยนชื่อเป็น “${title}” แล้ว` });
+      }}
+      onDeletePage={async (id) => {
+        // เปิดหน้านี้หรือหน้าย่อยของมันอยู่ → ต้องออกจากหน้านั้น
+        const openPageDeleted = id === pageId || Boolean(pageId && findAncestorIds(tree.data, pageId)?.includes(id));
+        await deletePage.mutateAsync(id); // error → ฟอร์มโชว์ข้อความเอง
+        toast({ tone: 'success', title: 'ลบหน้าแล้ว' });
+        if (openPageDeleted) navigate(`/spaces/${spaceKey}`, { replace: true });
+      }}
+      onUpdateSpace={async (changes) => {
+        await updateSpace.mutateAsync(changes); // error → ฟอร์มโชว์ข้อความเอง
+        toast({ tone: 'success', title: 'บันทึก space แล้ว' });
       }}
       onLinkIssue={async (issue) => {
         await link.mutateAsync({ issueKey: issue.key, pageId: pageId! }); // error → หน้าเลือก issue โชว์เอง

@@ -106,6 +106,20 @@ test.describe('docs: page tree', () => {
     expect(findNode(await tree(api, space.key), child.id)).toBeUndefined();
   });
 
+  test('TC-SPACE-007 patch renames a space, key and pages stay', { tag: '@P0' }, async ({ api, space }) => {
+    const child = await createPage(api, space.key);
+    const renamed = await expectResponse<any>(await api.patch(`/spaces/${space.key}`, { name: ' เอกสาร ', description: 'ทีม dev' }), 200, 'Space');
+    expect(renamed.key).toBe(space.key);
+    expect(renamed.name).toBe('เอกสาร');
+    expect(renamed.description).toBe('ทีม dev');
+    const onlyName = await expectResponse<any>(await api.patch(`/spaces/${space.key}`, { name: 'Docs' }), 200, 'Space');
+    expect(onlyName.description).toBe('ทีม dev');
+    expect((await expectResponse<any>(await api.get(`/pages/${child.id}`), 200, 'Page')).spaceKey).toBe(space.key);
+    await expectError(await api.patch(`/spaces/${space.key}`, { name: ' ' }), 400, 'VALIDATION_FAILED');
+    await expectError(await api.patch(`/spaces/${space.key}`, {}), 400, 'VALIDATION_FAILED');
+    await expectError(await api.patch('/spaces/NOPE999', { name: 'x' }), 404, 'NOT_FOUND');
+  });
+
   test('TC-PAGE-007 create page without title returns 400', { tag: '@P1' }, async ({ api, space }) => {
     await expectError(await api.post(`/spaces/${space.key}/pages`, { contentMd: 'x' }), 400, 'VALIDATION_FAILED');
   });

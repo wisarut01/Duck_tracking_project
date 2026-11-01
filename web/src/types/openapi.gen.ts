@@ -106,7 +106,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** แก้ชื่อ / คำอธิบาย project (key เปลี่ยนไม่ได้) */
+        patch: operations["updateProject"];
         trace?: never;
     };
     "/projects/{projectKey}/issues": {
@@ -193,6 +194,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/issues/{issueKey}/comments/{commentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                issueKey: components["parameters"]["IssueKey"];
+                commentId: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** ลบ comment (เฉพาะคนเขียน) */
+        delete: operations["deleteComment"];
+        options?: never;
+        head?: never;
+        /** แก้ comment (เฉพาะคนเขียน) */
+        patch: operations["updateComment"];
+        trace?: never;
+    };
     "/issues/{issueKey}/links": {
         parameters: {
             query?: never;
@@ -267,7 +289,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** แก้ชื่อ / คำอธิบาย space (key เปลี่ยนไม่ได้) */
+        patch: operations["updateSpace"];
         trace?: never;
     };
     "/spaces/{spaceKey}/pages": {
@@ -434,6 +457,10 @@ export interface components {
             name: string;
             description?: string | null;
         };
+        UpdateProjectRequest: {
+            name?: string;
+            description?: string | null;
+        };
         /** @enum {string} */
         IssueType: "TASK" | "BUG" | "STORY";
         /** @enum {string} */
@@ -547,8 +574,17 @@ export interface components {
              * @example 2026-10-03T08:30:00Z
              */
             createdAt: string;
+            /**
+             * Format: date-time
+             * @description แก้ไขล่าสุดเมื่อไหร่ หรือ `null` ถ้ายังไม่เคยแก้
+             * @example null
+             */
+            editedAt?: string | null;
         };
         CreateCommentRequest: {
+            body: string;
+        };
+        UpdateCommentRequest: {
             body: string;
         };
         CreateLinkRequest: {
@@ -581,6 +617,10 @@ export interface components {
             key: string;
             /** @example Engineering */
             name: string;
+            description?: string | null;
+        };
+        UpdateSpaceRequest: {
+            name?: string;
             description?: string | null;
         };
         PageSummary: {
@@ -700,7 +740,7 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description login แล้วแต่ไม่มีสิทธิ์ (อีเมลไม่อยู่ใน allowlist) หรือปิด login ด้วยรหัสผ่านไว้ */
+        /** @description login แล้วแต่ไม่มีสิทธิ์ (อีเมลไม่อยู่ใน allowlist, ปิด login ด้วยรหัสผ่านไว้ หรือแก้/ลบ comment ของคนอื่น) */
         Forbidden: {
             headers: {
                 [name: string]: unknown;
@@ -756,6 +796,7 @@ export interface components {
         ProjectKey: string;
         IssueKey: string;
         SpaceKey: string;
+        CommentId: string;
         PageId: string;
         Page: number;
         PageSize: number;
@@ -937,6 +978,35 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectKey: components["parameters"]["ProjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProjectRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -1173,6 +1243,62 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    deleteComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                issueKey: components["parameters"]["IssueKey"];
+                commentId: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                issueKey: components["parameters"]["IssueKey"];
+                commentId: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCommentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Comment"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     listIssueLinks: {
         parameters: {
             query?: never;
@@ -1310,6 +1436,35 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Space"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateSpace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                spaceKey: components["parameters"]["SpaceKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSpaceRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {

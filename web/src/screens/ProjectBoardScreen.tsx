@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Pencil } from 'lucide-react';
 import { errorMessage } from '@/api/client';
 import { useAppData } from '@/lib/appData';
 import { cn } from '@/lib/cn';
@@ -12,9 +13,12 @@ import {
   type MoveIssueRequest,
   type PageSummary,
   type Project,
+  type UpdateProjectRequest,
 } from '@/types/api';
 import { AppShell } from '@/components/layout/AppShell';
 import { Avatar } from '@/components/ui/Avatar';
+import { Button } from '@/components/ui/Button';
+import { RenameModal } from '@/components/ui/RenameModal';
 import { CreateIssueModal } from '@/components/issues/CreateIssueModal';
 import { IssueDetailPanel, type IssueActions } from '@/components/issues/IssueDetailPanel';
 import { IssueTypeIcon } from '@/components/issues/IssueTypeIcon';
@@ -34,6 +38,8 @@ export interface ProjectBoardScreenProps {
   onMoveIssue?: (issueKey: string, move: MoveIssueRequest) => void;
   /** สร้าง issue — throw เมื่อไม่สำเร็จ แล้ว modal จะโชว์ข้อความ error */
   onCreateIssue?: (request: CreateIssueRequest) => Promise<unknown> | void;
+  /** แก้ชื่อ / คำอธิบาย project — throw เมื่อไม่สำเร็จ แล้วฟอร์มจะโชว์ข้อความ error */
+  onUpdateProject?: (changes: UpdateProjectRequest) => Promise<unknown> | void;
 }
 
 /**
@@ -50,6 +56,7 @@ export function ProjectBoardScreen({
   issueActions,
   onMoveIssue,
   onCreateIssue,
+  onUpdateProject,
 }: ProjectBoardScreenProps) {
   const { users, currentUser, resolveIssue } = useAppData();
   const [createOpen, setCreateOpen] = useState(false);
@@ -57,6 +64,7 @@ export function ProjectBoardScreen({
   const [createCount, setCreateCount] = useState(0);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string>();
+  const [editingProject, setEditingProject] = useState(false);
   // ตัวกรอง: assignee (id) และ type
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<IssueType | null>(null);
@@ -101,7 +109,14 @@ export function ProjectBoardScreen({
           <div className="mb-5 flex flex-wrap items-end gap-4">
             <div className="mr-auto min-w-0 basis-full sm:basis-auto">
               <p className="font-mono text-xs font-bold text-ink-subtle">{project.key}</p>
-              <h1 className="text-2xl font-extrabold wrap-anywhere text-ink">{project.name}</h1>
+              <div className="flex items-center gap-1">
+                <h1 className="text-2xl font-extrabold wrap-anywhere text-ink">{project.name}</h1>
+                {onUpdateProject && (
+                  <Button variant="ghost" size="sm" iconOnly aria-label="แก้ไข project" onClick={() => setEditingProject(true)}>
+                    <Pencil size={14} aria-hidden />
+                  </Button>
+                )}
+              </div>
               {project.description && <p className="text-sm text-ink-muted">{project.description}</p>}
             </div>
 
@@ -189,6 +204,18 @@ export function ProjectBoardScreen({
         serverError={createError}
         onSubmit={handleCreate}
       />
+      {editingProject && (
+        <RenameModal
+          open
+          onClose={() => setEditingProject(false)}
+          title="แก้ไข project"
+          label="ชื่อ project"
+          initialName={project.name}
+          initialDescription={project.description ?? null}
+          maxLength={100}
+          onSubmit={({ name, description }) => onUpdateProject?.({ name, description })}
+        />
+      )}
     </AppShell>
   );
 }

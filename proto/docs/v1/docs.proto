@@ -17,6 +17,7 @@ service DocsService {
   rpc ListSpaces(ListSpacesRequest) returns (ListSpacesResponse);
   rpc CreateSpace(CreateSpaceRequest) returns (CreateSpaceResponse);
   rpc GetSpace(GetSpaceRequest) returns (GetSpaceResponse);
+  rpc UpdateSpace(UpdateSpaceRequest) returns (UpdateSpaceResponse);
 
   // ---- pages ----
   rpc GetPageTree(GetPageTreeRequest) returns (GetPageTreeResponse);
@@ -85,6 +86,16 @@ message GetSpaceRequest {
   string key = 1;
 }
 message GetSpaceResponse {
+  Space space = 1;
+}
+
+// PATCH semantics. Allowed paths: name, description (not set = null).
+message UpdateSpaceRequest {
+  string key = 1;
+  Space space = 2; // only the masked fields are read
+  google.protobuf.FieldMask update_mask = 3;
+}
+message UpdateSpaceResponse {
   Space space = 1;
 }
 

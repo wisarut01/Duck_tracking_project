@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import { ChevronDown, FileText, Pencil, Plus } from 'lucide-react';
+import { ChevronDown, FileText, Pencil, PencilLine, Plus, Trash2 } from 'lucide-react';
 import { useAppData } from '@/lib/appData';
 import { formatDate } from '@/lib/format';
-import type { IssueSummary, Page, PageTreeNode, Space, UpdatePageRequest } from '@/types/api';
+import { readDraft } from '@/lib/pageDraft';
+import type { IssueSummary, Page, PageTreeNode, Space, UpdatePageRequest, UpdateSpaceRequest } from '@/types/api';
 import { AppShell } from '@/components/layout/AppShell';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { RenameModal } from '@/components/ui/RenameModal';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { LinkedIssuesPanel } from '@/components/docs/LinkedIssuesPanel';
 import { MarkdownView } from '@/components/docs/MarkdownView';
@@ -25,8 +28,16 @@ export interface DocsPageScreenProps {
   defaultEditing?: boolean;
   onSelectPage?: (pageId: string) => void;
   onCreatePage?: (parentId: string | null) => void;
-  /** บันทึกหน้า — throw เมื่อไม่สำเร็จ แล้ว editor จะยังเปิดค้างไว้ */
+  /** autosave ของ editor — throw เมื่อไม่สำเร็จ แล้ว editor จะลองใหม่เอง */
   onSavePage?: (changes: UpdatePageRequest) => Promise<unknown> | void;
+  /** autosave ไม่สำเร็จหลัง editor ปิดไปแล้ว */
+  onBackgroundSaveError?: (error: unknown) => void;
+  /** กด "เสร็จสิ้น" ใน editor */
+  onFinishEditing?: () => void;
+  /** throw เมื่อไม่สำเร็จ แล้วฟอร์มจะโชว์ข้อความ error */
+  onRenamePage?: (pageId: string, title: string) => Promise<unknown> | void;
+  onDeletePage?: (pageId: string) => Promise<unknown> | void;
+  onUpdateSpace?: (changes: UpdateSpaceRequest) => Promise<unknown> | void;
   /** ลิงก์ issue กับหน้านี้ — throw เมื่อไม่สำเร็จ แล้วหน้าเลือก issue จะโชว์ error */
   onLinkIssue?: (issue: IssueSummary) => Promise<unknown> | void;
   onUnlinkIssue?: (issueKey: string) => void;
@@ -47,26 +58,40 @@ export function DocsPageScreen({
   onSelectPage,
   onCreatePage,
   onSavePage,
+  onBackgroundSaveError,
+  onFinishEditing,
+  onRenamePage,
+  onDeletePage,
+  onUpdateSpace,
   onLinkIssue,
   onUnlinkIssue,
 }: DocsPageScreenProps) {
   const { resolveIssue } = useAppData();
   const [editing, setEditing] = useState(defaultEditing);
-  const [saving, setSaving] = useState(false);
   // มือถือ: page tree ซ่อนไว้ กดปุ่มด้านบนเพื่อเปิด
   const [treeOpen, setTreeOpen] = useState(false);
+  // หน้าที่กำลังเปลี่ยนชื่อ / รอยืนยันการลบ, ฟอร์มแก้ไข space
+  const [renaming, setRenaming] = useState<Pick<PageTreeNode, 'id' | 'title'>>();
+  const [deleting, setDeleting] = useState<Pick<PageTreeNode, 'id' | 'title'>>();
+  const [editingSpace, setEditingSpace] = useState(false);
 
-  async function handleSave(changes: UpdatePageRequest) {
-    setSaving(true);
-    try {
-      await onSavePage?.(changes);
-      setEditing(false);
-    } catch {
-      // ข้อความ error แจ้งโดยตัวที่เรียก API (toast) — editor เปิดค้างไว้ให้แก้ต่อได้
-    } finally {
-      setSaving(false);
-    }
+  // มีฉบับร่างค้างอยู่ (บันทึกไม่ทันเมื่อครั้งก่อน) → เปิด editor ให้เลย ผู้ใช้จะได้ไม่เข้าใจว่าข้อความหาย
+  // เช็กครั้งเดียวตอนหน้าโหลดเสร็จ — ตั้ง state ระหว่าง render เหมือนใน AppShell
+  const [draftChecked, setDraftChecked] = useState(false);
+  if (page && !draftChecked) {
+    setDraftChecked(true);
+    if (readDraft(page.id)) setEditing(true);
   }
+
+  const treeProps = {
+    label: space.name,
+    nodes: tree,
+    activeId: page?.id,
+    onCreatePage,
+    onRenamePage: onRenamePage && setRenaming,
+    onDeletePage: onDeletePage && setDeleting,
+    onEditLabel: onUpdateSpace && (() => setEditingSpace(true)),
+  };
 
   let content;
   if (loadingPage) {
@@ -95,7 +120,16 @@ export function DocsPageScreen({
     );
   } else if (editing) {
     content = (
-      <PageEditor page={page} resolveIssue={resolveIssue} saving={saving} onCancel={() => setEditing(false)} onSave={handleSave} />
+      <PageEditor
+        page={page}
+        resolveIssue={resolveIssue}
+        onSave={onSavePage}
+        onBackgroundSaveError={onBackgroundSaveError}
+        onDone={() => {
+          setEditing(false);
+          onFinishEditing?.();
+        }}
+      />
     );
   } else {
     content = (
@@ -108,6 +142,16 @@ export function DocsPageScreen({
           <Button variant="secondary" size="sm" leftIcon={<Pencil size={14} aria-hidden />} onClick={() => setEditing(true)}>
             แก้ไข
           </Button>
+          {onRenamePage && (
+            <Button variant="ghost" size="sm" leftIcon={<PencilLine size={14} aria-hidden />} onClick={() => setRenaming(page)}>
+              เปลี่ยนชื่อ
+            </Button>
+          )}
+          {onDeletePage && (
+            <Button variant="ghost" size="sm" iconOnly aria-label="ลบหน้านี้" onClick={() => setDeleting(page)}>
+              <Trash2 size={14} aria-hidden />
+            </Button>
+          )}
         </div>
         <MarkdownView content={page.contentMd} resolveIssue={resolveIssue} />
       </article>
@@ -119,7 +163,7 @@ export function DocsPageScreen({
       <div className="flex min-h-full">
         {/* Page tree */}
         <aside aria-label="Page tree" className="hidden w-64 shrink-0 border-r border-border bg-surface/60 p-3 md:block">
-          <PageTree label={space.name} nodes={tree} activeId={page?.id} onSelect={onSelectPage} onCreatePage={onCreatePage} />
+          <PageTree {...treeProps} onSelect={onSelectPage} />
         </aside>
 
         {/* Content */}
@@ -138,14 +182,11 @@ export function DocsPageScreen({
             {treeOpen && (
               <div className="mt-2 rounded-xl border border-border bg-surface p-2">
                 <PageTree
-                  label={space.name}
-                  nodes={tree}
-                  activeId={page?.id}
+                  {...treeProps}
                   onSelect={(pageId) => {
                     setTreeOpen(false);
                     onSelectPage?.(pageId);
                   }}
-                  onCreatePage={onCreatePage}
                 />
               </div>
             )}
@@ -170,6 +211,41 @@ export function DocsPageScreen({
           </aside>
         )}
       </div>
+
+      {renaming && (
+        <RenameModal
+          key={renaming.id}
+          open
+          onClose={() => setRenaming(undefined)}
+          title="เปลี่ยนชื่อหน้า"
+          label="ชื่อหน้า"
+          initialName={renaming.title}
+          maxLength={200}
+          onSubmit={({ name }) => onRenamePage?.(renaming.id, name)}
+        />
+      )}
+      {deleting && (
+        <ConfirmModal
+          open
+          onClose={() => setDeleting(undefined)}
+          title={`ลบ “${deleting.title}”?`}
+          description="หน้าย่อยทั้งหมดและลิงก์กับ issue จะถูกลบด้วย ย้อนกลับไม่ได้"
+          confirmLabel="ลบหน้า"
+          onConfirm={() => onDeletePage?.(deleting.id)}
+        />
+      )}
+      {editingSpace && (
+        <RenameModal
+          open
+          onClose={() => setEditingSpace(false)}
+          title="แก้ไข space"
+          label="ชื่อ space"
+          initialName={space.name}
+          initialDescription={space.description ?? null}
+          maxLength={100}
+          onSubmit={({ name, description }) => onUpdateSpace?.({ name, description })}
+        />
+      )}
     </AppShell>
   );
 }
