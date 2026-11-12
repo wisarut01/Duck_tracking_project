@@ -1,7 +1,7 @@
 import createClient from "openapi-fetch";
 import type { paths } from "@/types/openapi.gen";
 import type { ApiError, ErrorCode } from "@/types/api";
-import { clearSession, getToken } from "./token";
+import { clearSession, getFreshToken, refreshToken } from "./token";
 
 /**
  * HTTP client ที่ type มาจาก openapi.yaml โดยตรง (openapi-fetch)
@@ -17,12 +17,29 @@ export const API_BASE_URL =
 
 export const api = createClient<paths>({ baseUrl: API_BASE_URL });
 
-// ใส่ Bearer token ให้ทุก request อัตโนมัติ
+// สำเนา request ที่ยังไม่ได้ส่ง (body ยังอ่านได้) เผื่อต้องส่งซ้ำหลัง refresh token
+const retryCopies = new Map<string, Request>();
+
+// ใส่ Bearer token ให้ทุก request อัตโนมัติ (token หมดอายุ → refresh ก่อนส่ง)
+// ถ้ายังโดน 401 อยู่ดี → refresh อีกรอบแล้วส่งซ้ำครั้งเดียว ก่อนจะยอมให้ unwrap() พาไปหน้า login
 api.use({
-  onRequest({ request }) {
-    const token = getToken();
+  async onRequest({ request, id }) {
+    const token = await getFreshToken();
     if (token) request.headers.set("Authorization", `Bearer ${token}`);
+    retryCopies.set(id, request.clone());
     return request;
+  },
+  async onResponse({ response, id }) {
+    const copy = retryCopies.get(id);
+    retryCopies.delete(id);
+    if (response.status !== 401 || !copy) return response;
+    const token = await refreshToken();
+    if (!token) return response;
+    copy.headers.set("Authorization", `Bearer ${token}`);
+    return fetch(copy);
+  },
+  onError({ id }) {
+    retryCopies.delete(id);
   },
 });
 

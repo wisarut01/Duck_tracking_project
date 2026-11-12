@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
@@ -93,6 +94,7 @@ func (s *server) validateSupabase(ctx context.Context, token string) (*authv1.Us
 		jwt.WithIssuer(s.supabase.issuer),
 		jwt.WithAudience(s.supabase.audience),
 		jwt.WithExpirationRequired(),
+		jwt.WithLeeway(30*time.Second), // นาฬิกาเครื่องเรากับ Supabase อาจต่างกันนิดหน่อย
 		jwt.WithTimeFunc(s.now),
 	)
 	if err != nil {

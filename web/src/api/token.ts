@@ -30,6 +30,34 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
+// ---------- token ที่ยังไม่หมดอายุ (Supabase) ----------
+
+/**
+ * token ใน localStorage อาจหมดอายุไปแล้ว เช่น ปิดฝาโน้ตบุ๊ก / สลับแท็บไปนาน
+ * (เบราว์เซอร์หยุดตัวจับเวลา refresh ของ Supabase ไว้) supabase.ts ลงทะเบียนตัวนี้ไว้:
+ * - fresh:   ขอ token ที่ยังใช้ได้ (หมดอายุ / ใกล้หมด → refresh ก่อนแล้วค่อยคืน)
+ * - refresh: บังคับ refresh ตอน API ตอบ 401 (null = refresh ไม่ได้ ต้อง login ใหม่จริง ๆ)
+ */
+type TokenSource = {
+  fresh: () => Promise<string | null>;
+  refresh: () => Promise<string | null>;
+};
+let tokenSource: TokenSource | null = null;
+
+export function setTokenSource(source: TokenSource) {
+  tokenSource = source;
+}
+
+/** token สำหรับแนบไปกับ request (ไม่มี Supabase = ตัวที่เก็บไว้ตรง ๆ) */
+export function getFreshToken(): Promise<string | null> {
+  return tokenSource ? tokenSource.fresh() : Promise.resolve(getToken());
+}
+
+/** ลอง refresh หลังโดน 401; ไม่มี Supabase = refresh ไม่ได้ (คืน null) */
+export function refreshToken(): Promise<string | null> {
+  return tokenSource ? tokenSource.refresh() : Promise.resolve(null);
+}
+
 // ---------- ออกจากระบบ (กด logout / API ตอบ 401 หรือ 403) ----------
 
 let signOutHook: (() => void) | null = null;

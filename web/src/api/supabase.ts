@@ -1,5 +1,5 @@
 import { createClient, type AuthError } from "@supabase/supabase-js";
-import { onSignOut, setToken } from "./token";
+import { onSignOut, setToken, setTokenSource } from "./token";
 
 /**
  * Login ผ่าน Supabase Auth (Google หรืออีเมล/รหัสผ่าน) — เปิดใช้เมื่อตั้ง env สองตัวนี้ (บน Vercel)
@@ -22,6 +22,17 @@ if (supabase) {
     setToken(session?.access_token ?? null),
   );
   onSignOut(() => void supabase.auth.signOut());
+  setTokenSource({
+    // getSession() refresh ให้เองถ้า token หมดอายุหรือเหลือไม่ถึง 90 วิ
+    async fresh() {
+      const { data } = await supabase.auth.getSession();
+      return data.session?.access_token ?? null;
+    },
+    async refresh() {
+      const { data, error } = await supabase.auth.refreshSession();
+      return error ? null : (data.session?.access_token ?? null);
+    },
+  });
 }
 
 /** URL ที่ Supabase พากลับมา: /login?next=… (LoginPage จะพาต่อไปหน้าเดิมเอง) */
